@@ -1,0 +1,16 @@
+name: Deploy on GitHub Pages
+on:
+  push:
+    branches: 
+      - main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: 3.x
+      # - run: pip install mkdocs-material 
+      - run: pip --trusted-host pypi.org --trusted-host files.pythonhosted.org install mkdocs-material mkdocs-heti-plugin==0.1.5
+      - run: mkdocs gh-deploy --force

@@ -1,0 +1,64 @@
+site_name: 浙江大学24年秋冬操作系统实验 
+site_url: https://zju-sec.github.io/os24fall-stu/
+repo_url: https://github.com/ZJU-SEC/os24fall-stu
+repo_name: ZJU-SEC/os24fall-stu
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  features:
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+  font:
+    code: Cascadia
+
+nav:
+  - 实验指导零: lab0.md
+  # - 实验指导一: lab1.md
+  # - 实验指导二: lab2.md
+  # - 实验指导三: lab3.md
+  # - 实验指导四: lab4.md
+  # - 实验指导五: lab5.md
+  # - 实验指导六: lab6.md
+  # - 实验指导七: lab7.md
+  - 常见问题及解答: faq.md
+
+markdown_extensions:
+  - attr_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+# plugins:
+#   - search
+#   - heti:
+#       extra_skipped_class:
+#         - arithmatex
+#       disable_serve: false
