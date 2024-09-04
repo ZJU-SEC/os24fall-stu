@@ -9,7 +9,7 @@
 ## 实验环境
 由于 [Ubuntu 24.04](https://ubuntu.com/blog/tag/ubuntu-24-04-lts) 暂时没有推出 arm 版本，使用 Mac with Apple Silicon 的同学可能无法使用 Ubuntu 24.04 进行实验，所以我们仍然沿用 Ubuntu 22.04。
 
-- [Ubuntu 22.04.3 LTS](https://releases.ubuntu.com/jammy/)
+- [Ubuntu 22.04.4 LTS](https://releases.ubuntu.com/jammy/)
 - [Ubuntu 22.04.2 LTS Windows Subsystem for Linux 2](https://www.microsoft.com/store/productId/9PN20MSR04DW)
 - Mac with Apple Silicon
 - 其他可行的平台，但我们不提供技术支持
