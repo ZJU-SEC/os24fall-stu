@@ -7,11 +7,12 @@
 - 熟悉GDB和QEMU联合调试
 
 ## 实验环境
-
+由于 [Ubuntu 24.04](https://ubuntu.com/blog/tag/ubuntu-24-04-lts) 暂时没有推出 arm 版本，使用 Mac with Apple Silicon 的同学可能无法使用 Ubuntu 24.04 进行实验，所以我们仍然沿用 Ubuntu 22.04。
 - [Ubuntu 22.04.3 LTS](https://ubuntu.com/download/desktop)
 - [Ubuntu 22.04.2 LTS Windows Subsystem for Linux 2](https://www.microsoft.com/store/productId/9PN20MSR04DW)
 - Mac with Apple Silicon
 - 其他可行的平台，但我们不提供技术支持
+
 
 ## 实验基础知识介绍
 
@@ -165,7 +166,7 @@ $ sudo apt install gdb-multiarch
 ### 获取 Linux 源码和已经编译好的文件系统
 
 从 [https://www.kernel.org](https://www.kernel.org) 下载最新的 Linux 源码。
-> 截至写作时，最新的 Linux 内核版本是 6.6-rc1.
+> 截至写作时，最新的 Linux 内核版本是 6.11-rc6.
 
 并且使用 git 工具 clone [本仓库](https://github.com/ZJU-SEC/os24fall-stu)。其中已经准备好了根文件系统的镜像。
 
