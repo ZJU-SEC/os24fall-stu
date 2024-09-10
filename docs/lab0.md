@@ -81,7 +81,7 @@ GDB 的功能十分强大，我们经常在调试中用到的有:
 - `(gdb) start`：单步执行，运行程序，停在第一执行语句
 - `(gdb) continue`：从断点后继续执行，简写 `c`
 - `(gdb) next`：单步调试（逐过程，函数直接执行），简写 `n`
-- `(gdb) step instruction`：执行单条指令，简写 `si`
+- `(gdb) stepi`：执行单条指令，简写 `si`
 - `(gdb) run`：重新开始运行文件（run-text：加载文本文件，run-bin：加载二进制文件），简写 `r`
 - `(gdb) backtrace`：查看函数的调用的栈帧和层级关系，简写 `bt`
 - `(gdb) break` 设置断点，简写 `b`
