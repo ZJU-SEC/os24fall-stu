@@ -13,12 +13,12 @@ theme:
     - media: "(prefers-color-scheme: light)"
       scheme: default
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
   features:
     - content.code.annotate
@@ -30,6 +30,7 @@ theme:
     code: Cascadia
 
 nav:
+  - 首页: index.md
   - 实验指导零: lab0.md
   # - 实验指导一: lab1.md
   # - 实验指导二: lab2.md
