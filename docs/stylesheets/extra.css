@@ -48,3 +48,6 @@ h6:before {
     content: counter(h2) "." counter(h3) "." counter(h4) "." counter(h5) "." counter(h6);
     margin-right: 0.8rem;
 }
+body {
+  text-spacing-trim: space-all;
+}

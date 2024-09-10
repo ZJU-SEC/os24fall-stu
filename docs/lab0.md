@@ -47,23 +47,24 @@ $ qemu-system-riscv64 \
     -S -s
 ```
 
-- `-nographic`: 不使用图形窗口，使用命令行
-- `-machine`: 指定要 emulate 的机器，可以通过命令 `qemu-system-riscv64 -machine help` 查看可选择的机器选项
-- `-kernel`: 指定内核 image
-- `-append cmdline`: 使用cmdline作为内核的命令行
-- `-device`: 指定要模拟的设备，可以通过命令 `qemu-system-riscv64 -device help` 查看可选择的设备，通过命令 `qemu-system-riscv64 -device <具体的设备>,help` 查看某个设备的命令选项
-- `-drive, file=<file_name>`: 使用 `file_name` 作为文件系统
-- `-S`: 启动时暂停CPU执行
-- `-s`: `-gdb tcp::1234` 的简写
-- `-bios default`: 使用默认的 OpenSBI firmware 作为 bootloader
+- `-nographic`：不使用图形窗口，使用命令行
+- `-machine`：指定要 emulate 的机器，可以通过命令 `qemu-system-riscv64 -machine help` 查看可选择的机器选项
+- `-kernel`：指定内核 image
+- `-append cmdline`：使用cmdline作为内核的命令行
+- `-device`：指定要模拟的设备，可以通过命令 `qemu-system-riscv64 -device help` 查看可选择的设备，通过命令 `qemu-system-riscv64 -device <具体的设备>,help` 查看某个设备的命令选项
+- `-drive, file=<file_name>`：使用 `file_name` 作为文件系统
+- `-S`：启动时暂停CPU执行
+- `-s`：`-gdb tcp::1234` 的简写
+- `-bios default`：使用默认的 OpenSBI firmware 作为 bootloader
 
-更多参数信息可以参考[这里](https://www.qemu.org/docs/master/system/index.html)
+更多参数信息可以参考[这里](https://www.qemu.org/docs/master/system/index.html)。
 
 ### GDB 使用基础
 
 #### 什么是 GDB
 
 GNU 调试器（英语：GNU Debugger，缩写：gdb）是一个由 GNU 开源组织发布的、UNIX/LINUX 操作系统下的、基于命令行的、功能强大的程序调试工具。借助调试器，我们能够查看另一个程序在执行时实际在做什么（比如访问哪些内存、寄存器），在其他程序崩溃的时候可以比较快速地了解导致程序崩溃的原因。
+
 被调试的程序可以和 GDB 运行在同一台机器上，并由 GDB 控制（本地调试 native debug）。也可以只和 `gdb-server` 运行在同一台机器上，由连接着 `gdb-server` 的 GDB 进行控制（远程调试 remote debug）。
 
 GDB 的功能十分强大，我们经常在调试中用到的有:
@@ -75,25 +76,25 @@ GDB 的功能十分强大，我们经常在调试中用到的有:
 
 #### GDB 基本命令介绍
 
-- `(gdb) layout asm`: 显示汇编代码
-- `(gdb) start`: 单步执行，运行程序，停在第一执行语句
-- `(gdb) continue`: 从断点后继续执行，简写 `c`
-- `(gdb) next`: 单步调试（逐过程，函数直接执行），简写 `n`
-- `(gdb) step instruction`: 执行单条指令，简写 `si`
-- `(gdb) run`: 重新开始运行文件（run-text：加载文本文件，run-bin：加载二进制文件），简写 `r`
+- `(gdb) layout asm`：显示汇编代码
+- `(gdb) start`：单步执行，运行程序，停在第一执行语句
+- `(gdb) continue`：从断点后继续执行，简写 `c`
+- `(gdb) next`：单步调试（逐过程，函数直接执行），简写 `n`
+- `(gdb) step instruction`：执行单条指令，简写 `si`
+- `(gdb) run`：重新开始运行文件（run-text：加载文本文件，run-bin：加载二进制文件），简写 `r`
 - `(gdb) backtrace`：查看函数的调用的栈帧和层级关系，简写 `bt`
 - `(gdb) break` 设置断点，简写 `b`
     - 断在 `foo` 函数：`b foo`
-    - 断在某地址: `b * 0x80200000`
-- `(gdb) finish`: 结束当前函数，返回到函数调用点
-- `(gdb) frame`: 切换函数的栈帧，简写 `f`
-- `(gdb) print`: 打印值及地址，简写 `p`
-- `(gdb) info`: 查看函数内部局部变量的数值，简写 `i`
-    - 查看寄存器 ra 的值: `i r ra`
-- `(gdb) display`: 追踪查看具体变量值
-- `(gdb) x/4x <addr>`: 以 16 进制打印 `<addr>` 处开始的 16 Bytes 内容
+    - 断在某地址：`b * 0x80200000`
+- `(gdb) finish`：结束当前函数，返回到函数调用点
+- `(gdb) frame`：切换函数的栈帧，简写 `f`
+- `(gdb) print`：打印值及地址，简写 `p`
+- `(gdb) info`：查看函数内部局部变量的数值，简写 `i`
+    - 查看寄存器 ra 的值：`i r ra`
+- `(gdb) display`：追踪查看具体变量值
+- `(gdb) x/4x <addr>`：以 16 进制打印 `<addr>` 处开始的 16 Bytes 内容
 
-更多命令可以参考[100个gdb小技巧](https://wizardforcel.gitbooks.io/100-gdb-tips/content/)
+更多命令可以参考[100个gdb小技巧](https://wizardforcel.gitbooks.io/100-gdb-tips/content/)。
 
 ### Linux 内核编译基础
 
@@ -141,10 +142,12 @@ $ make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu-  # 编译 RISC-V 平台内核
 ### 搭建实验环境环境
 
 > 如果你在使用 Mac with Apple Silicon, 请直接使用 Docker Desktop 进行课程实验。
+> 
 > Docker Desktop 的安装可以参考 [Docker Desktop for Apple silicon](https://docs.docker.com/desktop/mac/apple-silicon/)。
+> 
 > 之后使用 `docker pull ubuntu:22.04 && docker run -it --name <some-name> ubuntu:22.04 bash` 来启动一个运行在虚拟机上的 Ubuntu for ARM 容器，并将这个 Ubuntu 作为实验环境。
 
-首先安装编译内核所需要的交叉编译工具链和用于构建程序的软件包
+首先安装编译内核所需要的交叉编译工具链和用于构建程序的软件包：
 
 ```bash
 $ sudo apt install  gcc-riscv64-linux-gnu
@@ -153,13 +156,14 @@ $ sudo apt install  autoconf automake autotools-dev curl libmpc-dev libmpfr-dev 
                     zlib1g-dev libexpat-dev git
 ```
 
-接着是用于启动 riscv64 平台上的内核的模拟器 `qemu`
+接着是用于启动 riscv64 平台上的内核的模拟器 `qemu`：
 
 ```bash
 $ sudo apt install qemu-system-misc
 ```
 
-我们还需要用 `gdb` 来对在 `qemu` 上运行的 Linux 内核进行调试
+我们还需要用 `gdb` 来对在 `qemu` 上运行的 Linux 内核进行调试：
+
 ```bash
 $ sudo apt install gdb-multiarch
 ```

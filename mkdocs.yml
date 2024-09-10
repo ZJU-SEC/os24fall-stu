@@ -2,9 +2,13 @@ site_name: 浙江大学24年秋冬操作系统实验
 site_url: https://zju-sec.github.io/os24fall-stu/
 repo_url: https://github.com/ZJU-SEC/os24fall-stu
 repo_name: ZJU-SEC/os24fall-stu
+edit_uri: tree/main/docs
 
 theme:
   name: material
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -17,6 +21,8 @@ theme:
         icon: material/toggle-switch
         name: Switch to light mode
   features:
+    - content.code.annotate
+    - content.action.edit
     - navigation.top
     - navigation.footer
     - navigation.tracking
@@ -35,15 +41,33 @@ nav:
   - 常见问题及解答: faq.md
 
 markdown_extensions:
+  - toc:
+      permalink: true
+      toc_depth: 4
+  - meta
+  - def_list
   - attr_list
+  - md_in_html
+  - sane_lists
+  - admonition
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.snippets
+  - pymdownx.magiclink
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.highlight:
-      linenums: true
-  - pymdownx.superfences
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      anchor_linenums: true
   - pymdownx.arithmatex:
       generic: true
 
@@ -54,11 +78,10 @@ extra_javascript:
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
 extra_css:
+  - https://fonts.googleapis.com/css?family=Roboto:500,500i,600,600i&display=fallback
   - stylesheets/extra.css
 
-# plugins:
-#   - search
-#   - heti:
-#       extra_skipped_class:
-#         - arithmatex
-#       disable_serve: false
+plugins:
+  - search
+  - heti:
+      disable_serve: false
