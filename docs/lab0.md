@@ -159,7 +159,13 @@ $ make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu-  # 编译 RISC-V 平台内核
 !!! tip "关于 docker 源"
     由于 dockerhub 官方源在国内已无法访问，需要使用 docker 的同学可以自行通过代理解决，或者参考 [CF-Workers-docker.io](https://github.com/cmliu/CF-Workers-docker.io) 使用一些第三方镜像源。
 
-首先安装编译内核所需要的交叉编译工具链和用于构建程序的软件包：
+首先更新软件包列表以确保安装最新的软件包：
+
+```bash
+$ sudo apt update
+```
+
+安装编译内核所需要的交叉编译工具链和用于构建程序的软件包：
 
 ```bash
 $ sudo apt install  gcc-riscv64-linux-gnu
