@@ -208,7 +208,7 @@ rootfs.img  # 已经构建完成的根文件系统的镜像
 ### 编译 Linux 内核
 
 ```bash
-$ cd path/to/linux
+$ cd path/to/linux                                              # 修改为实际路径
 $ make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- defconfig    # 使用默认配置
 $ make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- -j$(nproc)   # 编译
 ```
