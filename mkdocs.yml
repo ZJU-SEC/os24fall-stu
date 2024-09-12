@@ -32,7 +32,7 @@ theme:
 nav:
   - 首页: index.md
   - 实验指导零: lab0.md
-  # - 实验指导一: lab1.md
+  - 实验指导一: lab1.md
   # - 实验指导二: lab2.md
   # - 实验指导三: lab3.md
   # - 实验指导四: lab4.md
