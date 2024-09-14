@@ -22,7 +22,7 @@
 
 为了顺利完成 OS 实验，我们需要一些前置知识和较多调试技巧。在 OS 实验中我们需要 **RISC-V汇编** 的前置知识，课堂上不会讲授，请同学们通过阅读以下四份文档自学：
 
-- [RISC-V Assembly Programmer's Manual](https://github.com/riscv-non-isa/riscv-asm-manual/blob/master/riscv-asm.md)
+- [RISC-V Assembly Programmer's Manual](https://github.com/riscv-non-isa/riscv-asm-manual/blob/f8bcdded42ac9108e0bf7cf0789dbe306ec329e2/riscv-asm.md)
 - [RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf)
 - [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf)
 - [RISC-V 手册（中文）](http://riscvbook.com/chinese/RISC-V-Reader-Chinese-v2p1.pdf)
@@ -46,7 +46,7 @@ RISC-V 有三个特权模式：U (user) 模式、S (supervisor) 模式和 M (mac
 - S 模式介于 M 模式和 U 模式之间，在操作系统中对应于内核态 (Kernel)。当用户需要内核资源时，向内核申请，并切换到内核态进行处理
 - U 模式用于执行用户程序，在操作系统中对应于用户态，有**最低**级别的权限
 
-#### 3.1.3 从计算机上电到 OS 运行
+#### 从计算机上电到 OS 运行
 
 我们以最基础的嵌入式系统为例，计算机上电后，首先硬件进行一些基础的初始化后，将 CPU 的 Program Counter 移动到内存中 Bootloader 的起始地址。
 Bootloader 是操作系统内核运行之前，用于初始化硬件，加载操作系统内核。
