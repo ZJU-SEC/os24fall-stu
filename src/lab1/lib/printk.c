@@ -1,11 +1,12 @@
+// credit: 45gfg9 <45gfg9@45gfg9.net>
+
 #include "printk.h"
 #include "sbi.h"
 
-void putc(char c) {
-    sbi_ecall(SBI_PUTCHAR, 0, c, 0, 0, 0, 0, 0);
+int putc(int c) {
+    sbi_debug_console_write_byte(c);
+    return (char)c;
 }
-
-// credit: 45gfg9 <45gfg9@45gfg9.net>
 
 #ifndef __MAX
 #define __MAX(a, b)         \

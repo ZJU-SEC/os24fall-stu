@@ -1,7 +1,6 @@
 C_SRC       = $(sort $(wildcard *.c))
 OBJ		    = $(patsubst %.c,%.o,$(C_SRC))
 
-file = main.o
 all:$(OBJ)
 	
 %.o:%.c

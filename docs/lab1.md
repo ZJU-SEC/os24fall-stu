@@ -1,9 +1,9 @@
 # Lab 1: RV64 内核引导与时钟中断处理
 
 ## 实验目的
-* 学习 RISC-V 汇编， 编写 head.S 实现跳转到内核运行的第一个 C 函数；
+* 学习 RISC-V 汇编，编写 head.S 实现跳转到内核运行的第一个 C 函数；
 * 学习 OpenSBI，理解 OpenSBI 在实验中所起到的作用，并调用 OpenSBI 提供的接口完成字符的输出；
-* 学习 Makefile 相关知识， 补充项目中的 Makefile 文件， 来完成对整个工程的管理；
+* 学习 Makefile 相关知识，补充项目中的 Makefile 文件，来完成对整个工程的管理；
 * 学习 RISC-V 的 trap 处理相关寄存器与指令，完成对 trap 处理的初始化；
 * 理解 CPU 上下文切换机制，并正确实现上下文切换功能；
 * 编写 trap 处理函数，完成对特定 trap 的处理；
@@ -18,17 +18,23 @@
 
 ### RV64 内核引导
 
-#### 前置知识
+#### RISC-V 手册
 
-为了顺利完成 OS 实验，我们需要一些前置知识和较多调试技巧。在 OS 实验中我们需要 **RISC-V汇编**的前置知识，课堂上不会讲授，请同学们通过阅读以下几份文档自学：
+为了顺利完成 OS 实验，我们需要很多 RISC-V 指令集的基础知识，这些课堂上大部分不会讲授，请同学们通过阅读以下几份手册文档进行自学：
 
-- [RISC-V Assembly Programmer's Manual](https://github.com/riscv-non-isa/riscv-asm-manual/blob/f8bcdded42ac9108e0bf7cf0789dbe306ec329e2/riscv-asm.md)
-- [RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf)
-- [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf)
+- [RISC-V Assembly Programmer's Manual](https://github.com/riscv-non-isa/riscv-asm-manual/blob/main/src/asm-manual.adoc)
+- [RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf)
+- [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/priv-isa-asciidoc.pdf)
+- [RISC-V Supervisor Binary Interface Specification](https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0/riscv-sbi.pdf)（SBI）
 
 !!! tip "指令速查以及快速学习可以参考 https://note.tonycrane.cc/cs/pl/riscv/"
 
-!!! warning "一切均以 spec 为准，不可跳过阅读 spec 这一步骤"
+!!! warning "一切均以 spec 为准，不可跳过阅读 spec 这一步骤；中文版 RISC-V 手册质量良莠不齐，请谨慎参考并以英文版内容为准。"
+
+!!! note "关于手册版本"
+    RISC-V ISA 的手册已经更新到当前最新的 ratified 版本，即 20240411 版本。过去的老版本为 20191213 的非特权级 ISA 和 20211203 的特权级 ISA，相比之下当前的文档样式和内容上都有所改变，一切以最新 ratified spec 为准。
+
+    除去 RISC-V ISA 的手册外，其他 RISC-V 的技术规范也可以在 [RISC-V Wiki - RISC-V Tecnical Specifications](https://wiki.riscv.org/display/HOME/RISC-V+Technical+Specifications) 中找到，感兴趣的同学可以自行查阅。
 
 #### RISC-V 的三种特权模式
 
@@ -38,22 +44,22 @@ RISC-V 有三个特权模式：U（user）模式、S（supervisor）模式和 M�
 | ------ | -------- |----------------- | ------------ |
 |   0    |    00    | User/Application |      U       |
 |   1    |    01    |     Supervisor   |      S       |
-|   2    |    10    |      Reserved    |              |
+|   2    |    10    |                  |              |
 |   3    |    11    |      Machine     |      M       |
 
 其中：
 
 - M 模式是对硬件操作的抽象，有**最高**级别的权限；
-- S 模式介于 M 模式和 U 模式之间，在操作系统中对应于内核态（Kernel）。当用户需要内核资源时，向内核申请，并切换到内核态进行处理；
+- S 模式介于 M 模式和 U 模式之间，在操作系统中对应于内核态（kernel）。当用户需要内核资源时，向内核申请，并切换到内核态进行处理；
 - U 模式用于执行用户程序，在操作系统中对应于用户态，有**最低**级别的权限。
 
 #### 从计算机上电到 OS 运行
 
-我们以最基础的嵌入式系统为例，计算机上电后，首先硬件进行一些基础的初始化后，将 CPU 的 Program Counter 移动到内存中 Bootloader 的起始地址。
+我们以最基础的嵌入式系统为例，计算机上电后，首先硬件进行一些基础的初始化后，将 CPU 的 Program Counter 移动到内存中 bootloader 的起始地址。
 
 Bootloader 是操作系统内核运行之前，用于初始化硬件，加载操作系统内核。
 
-在 RISC-V 架构里，Bootloader 运行在 M 模式下。Bootloader 运行完毕后就会把当前模式切换到 S 模式下，机器随后开始运行 Kernel。
+在 RISC-V 架构里，bootloader 运行在 M 模式下。Bootloader 运行完毕后就会把当前模式切换到 S 模式下，机器随后开始运行 kernel。
 
 这个过程简单而言就是这样：
 
@@ -66,7 +72,7 @@ Bootloader 是操作系统内核运行之前，用于初始化硬件，加载操
 
 #### SBI 与 OpenSBI
 
-SBI（Supervisor Binary Interface）是 S-mode 的 Kernel 和 M-mode 执行环境之间的接口规范，而 OpenSBI 是一个 RISC-V SBI 规范的开源实现。RISC-V 平台和 SoC 供应商可以自主扩展 OpenSBI 实现，以适应特定的硬件配置。
+SBI（Supervisor Binary Interface）是 S-mode 的 Kernel 和 M-mode 执行环境之间的接口规范，而 [OpenSBI](https://github.com/riscv-software-src/opensbi) 是一个 [RISC-V SBI 规范](https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0/riscv-sbi.pdf)的开源实现。RISC-V 平台和 SoC 供应商可以自主扩展 OpenSBI 实现，以适应特定的硬件配置。
 
 简单的说，为了使操作系统内核适配不同硬件，OpenSBI 提出了一系列规范对 M-mode 下的硬件进行了统一定义，运行在 S-mode 下的内核可以按照这些规范对不同硬件进行操作。
 
@@ -78,12 +84,12 @@ SBI（Supervisor Binary Interface）是 S-mode 的 Kernel 和 M-mode 执行环�
 
 !!! note "如果你对 RISC-V 架构的 boot 流程有更多的好奇，可以参考这份 [bootflow](https://riscv.org/wp-content/uploads/2019/12/Summit_bootflow.pdf)"
 
-#### Makefile
+#### GNU Make
 
-Makefile 可以简单的认为是一个工程文件的编译规则，描述了整个工程的编译和链接流程。在 Lab0 中我们已经使用了 make 工具利用 Makefile 文件来管理整个工程。在阅读了 [Makefile 介绍](https://seisman.github.io/how-to-write-makefile/introduction.html)这一章节后，同学们可以根据工程文件夹里 Makefile 的代码来掌握一些基本的使用技巧。
+GNU Make 是一个用于自动化编译的工具，它通过读取 Makefile 文件中的规则来执行编译过程。Makefile 文件中包含了一系列的规则，描述了源文件之间的依赖关系，以及如何编译和链接这些源文件。在阅读了 [Makefile 介绍](https://seisman.github.io/how-to-write-makefile/introduction.html)这一章节后，同学们可以根据工程文件夹里 Makefile 的代码来掌握一些基本的使用技巧。
 
 #### 内联汇编
-内联汇编（通常由 `asm` 或者 `__asm__` 关键字引入）提供了将汇编语言源代码嵌入 C 程序的能力。
+内联汇编（通常由 `#!c asm` 或者 `#!c __asm__` 关键字引入）提供了将汇编语言源代码嵌入 C 程序的能力。
 
 内联汇编的详细介绍请参考 [Assembler Instructions with C Expression Operands](https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html) 。
 
@@ -114,9 +120,9 @@ Makefile 可以简单的认为是一个工程文件的编译规则，描述了�
 ??? example "示例一"
 
     ```c
-    unsigned long long s_example(unsigned long long type,unsigned long long arg0) {
+    unsigned long long s_example(unsigned long long type, unsigned long long arg0) {
         unsigned long long ret_val;
-        __asm__ volatile (
+        asm volatile (
             "mv x10, %[type]\n"
             "mv x11, %[arg0]\n"
             "mv %[ret_val], x12"
@@ -134,8 +140,7 @@ Makefile 可以简单的认为是一个工程文件的编译规则，描述了�
 ??? example "示例二"
 
     ```c
-    #define write_csr(reg, val) ({
-        __asm__ volatile ("csrw " #reg ", %0" :: "r"(val)); })
+    #define write_csr(reg, val) ({ asm volatile ("csrw " #reg ", %0" :: "r"(val)); })
     ```
 
     示例二定义了一个宏，其中 `%0` 代表着输出输入部分的第一个符号，即 `val`。
@@ -145,41 +150,61 @@ Makefile 可以简单的认为是一个工程文件的编译规则，描述了�
     例如 `write_csr(sstatus,val)` 经宏展开会得到：
 
     ```c
-    ({
-        __asm__ volatile ("csrw " "sstatus" ", %0" :: "r"(val)); })
+    ({ asm volatile ("csrw " "sstatus" ", %0" :: "r"(val)); })
     ```
 
-    此外，这个示例中的 `({...})` 还涉及了一个 GNU 对 C 的扩展，可以参考 [Statements and Declarations in Expressions](https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html)。复合语句中的最后一项应该是一个表达式，后跟一个分号 `;` 该子表达式的值用作整个语句的值，可以用来实现类似“返回值”的效果。
+    此外，这个示例中的 `({...})` 还涉及了一个 GNU 对 C 的扩展，用于将一段代码块作为一个表达式来使用，可以参考 [Statements and Declarations in Expressions](https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html)。比如以下代码：
 
+    ```c 
+    #define max(a, b)            \
+    ({                         \
+        __typeof__(a) __a = (a); \
+        __typeof__(b) __b = (b); \
+        __a > __b ? __a : __b;   \
+    })
+
+    int c = max(x++, y++);
+    ```
+
+    在宏展开之后就变成了：
+
+    ```c 
+    int c = ({
+    __typeof__(x++) __a = (x++);
+    __typeof__(y++) __b = (y++);
+    __a > __b ? __a : __b;
+    });
+    ```
+
+    这样的写法可以避免宏展开后的副作用，在上面的例子中 `x++` 和 `y++` 只会被执行一次，同学们可以自行比较其与 `#!c #define max(a, b) ((a) > (b) ? (a) : (b))` 的区别。
 
 #### 编译相关知识介绍
 ##### vmlinux.lds
 
-GNU ld 即链接器，用于将 `*.o` 文件（和库文件）链接成可执行文件。在操作系统开发中，为了指定程序的内存布局，ld 使用链接脚本（Linker Script）来控制，在 Linux Kernel 中链接脚本被命名为 vmlinux.lds。更多关于 ld 的介绍可以使用 `man ld` 命令。
+GNU ld 即链接器，用于将 `*.o` 文件（和库文件）链接成可执行文件。在操作系统开发中，为了指定程序的内存布局，ld 使用链接脚本（Linker Script）来控制，在 Linux kernel 中链接脚本被命名为 vmlinux.lds。更多关于 ld 的介绍可以使用 `man ld` 命令。
 
-下面给出一个 vmlinux.lds 的例子：
+下面给出一个 `vmlinux.lds` 的例子：
 
 ```lds
 /* 目标架构 */
-OUTPUT_ARCH( "riscv" )
+OUTPUT_ARCH("riscv")
 
 /* 程序入口 */
-ENTRY( _start )
+ENTRY(_start)
 
-/* kernel代码起始位置 */
+/* kernel 代码起始位置 */
 BASE_ADDR = 0x80200000;
 
-SECTIONS
-{
+SECTIONS {
     /* . 代表当前地址 */
     . = BASE_ADDR;
 
-    /* 记录kernel代码的起始地址 */
+    /* 记录 kernel 代码的起始地址 */
     _skernel = .;
 
-    /* ALIGN(0x1000) 表示4KB对齐 */
-    /* _stext, _etext 分别记录了text段的起始与结束地址 */
-    .text : ALIGN(0x1000){
+    /* ALIGN(0x1000) 表示 4KiB 对齐 */
+    /* _stext, _etext 分别记录了 text 段的起始与结束地址 */
+    .text : ALIGN(0x1000) {
         _stext = .;
 
         *(.text.entry)
@@ -188,7 +213,7 @@ SECTIONS
         _etext = .;
     }
 
-    .rodata : ALIGN(0x1000){
+    .rodata : ALIGN(0x1000) {
         _srodata = .;
 
         *(.rodata .rodata.*)
@@ -196,7 +221,7 @@ SECTIONS
         _erodata = .;
     }
 
-    .data : ALIGN(0x1000){
+    .data : ALIGN(0x1000) {
         _sdata = .;
 
         *(.data .data.*)
@@ -204,7 +229,7 @@ SECTIONS
         _edata = .;
     }
 
-    .bss : ALIGN(0x1000){
+    .bss : ALIGN(0x1000) {
         _sbss = .;
 
         *(.bss.stack)
@@ -214,33 +239,33 @@ SECTIONS
         _ebss = .;
     }
 
-    /* 记录kernel代码的结束地址 */
+    /* 记录 kernel 代码的结束地址 */
     _ekernel = .;
 }
 ```
 
-- OUTPUT_ARCH 指定了架构为 RISC-V；
-- ENTRY 指定程序入口点为 `_start` 函数，程序入口点即程序启动时运行的函数，经过这样的指定后在 head.S 中需要编写 `_start` 函数，程序才能正常运行；
+- `OUTPUT_ARCH` 指定了架构为 RISC-V；
+- `ENTRY` 指定程序入口点为 `_start` 函数，程序入口点即程序启动时运行的函数，经过这样的指定后在 head.S 中需要编写 `_start` 函数，程序才能正常运行；
 - 链接脚本中有 `.` `*` 两个重要的符号：
     - 单独的 `.` 在链接脚本代表当前地址，它有赋值、被赋值、自增等操作；
     - `*` 有两种用法，其一是 `*()` 在大括号中表示将所有文件中符合括号内要求的段放置在当前位置，其二是作为通配符；
-- 链接脚本的主体是 SECTIONS 部分，在这里链接脚本的工作是将程序的各个段按顺序放在各个地址上；
+- 链接脚本的主体是 `SECTIONS` 部分，在这里链接脚本的工作是将程序的各个段按顺序放在各个地址上；
     - 在例子中就是从 `0x80200000` 地址开始放置了 `.text`、`.rodata`、`.data` 和 `.bss` 段，各个段的作用可以简要概括成：
 
-    | 段名     | 主要作用                       |
-    | ------- | ----------------------------- |
-    | .text   | 通常存放程序执行代码              |
-    | .rodata | 通常存放常量等只读数据            |
-    | .data   | 通常存放已初始化的全局变量、静态变量 |
-    | .bss    | 通常存放未初始化的全局变量、静态变量 |
+    | 段名      | 主要作用                       |
+    | --------- | ----------------------------- |
+    | `.text`   | 通常存放程序执行代码              |
+    | `.rodata` | 通常存放常量等只读数据            |
+    | `.data`   | 通常存放已初始化的全局变量、静态变量 |
+    | `.bss`    | 通常存放未初始化的全局变量、静态变量 |
 
-- 在链接脚本中可以自定义符号，例如以上所有 `_s` 与  `_e`开头的符号都是我们自己定义的。
+- 在链接脚本中可以自定义符号，例如以上所有 `_s` 与 `_e` 开头的符号都是我们自己定义的。
 
 !!! tip "更多有关链接脚本语法可以参考 [ld script 文档](https://sourceware.org/binutils/docs/ld/Scripts.html)"
 
 ##### vmlinux
 
-vmlinux 通常指 Linux Kernel 编译出的可执行文件（Executable and Linkable Format，ELF），特点是未压缩的，带调试信息和符号表的。在整套 OS 实验中，vmlinux 通常指将你的代码进行编译，链接后生成的可供 QEMU 运行的 RV64 架构程序。如果对 vmlinux 使用 `file` 命令，你将看到如下信息：
+vmlinux 通常指 Linux kernel 编译出的可执行文件（Executable and Linkable Format，ELF），特点是未压缩的，带调试信息和符号表的。在整套 OS 实验中，vmlinux 通常指将你的代码进行编译，链接后生成的可供 QEMU 运行的 RV64 架构程序。如果对 vmlinux 使用 `file` 命令，你将看到如下信息：
 
 ```bash
 $ file vmlinux 
@@ -269,19 +294,19 @@ ffffffe000000190 t debug_kernel
 ### RV64 时钟中断处理
 
 !!! warning
-    本 3.1 节涉及到很多 RISC-V 特权级指令的知识，在学习中请同时参考 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) 阅读详细信息，如果本文档和 spec 中有任何出入的地方，请以 spec 为准，并及时向助教反馈。
+    本 3.1 节涉及到很多 RISC-V 特权级指令的知识，在学习中请同时参考 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/priv-isa-asciidoc.pdf) 阅读详细信息，如果本文档和 spec 中有任何出入的地方，请以 spec 为准，并及时向助教反馈。
 
     关于 RISC-V 特权级 ISA，也可以参考 <https://note.tonycrane.cc/cs/pl/riscv/privileged/>。
 
-如果完成了 **3.1** 中的 **RV64 内核引导**，我们能成功地将一个最简单的 OS 启动起来， 但还没有办法与之交互。我们在课程中讲过操作系统启动之后由**事件**（**event**）驱动，在本次实验的后半部分中，我们将引入一种重要的事件 **trap**。
+如果完成了 **3.1** 中的 **RV64 内核引导**，我们能成功地将一个最简单的 OS 启动起来，但还没有办法与之交互。我们在课程中讲过操作系统启动之后由**事件**（**event**）驱动，在本次实验的后半部分中，我们将引入一种重要的事件 **trap**。
 
-trap 给了 OS 与硬件、软件交互的能力。在 **3.1** 中我们介绍了在 RISC-V 中有三种特权级（M 态、S 态、U 态）， 在 boot 阶段，OpenSBI 已经帮我们将 M 态的 trap 处理进行了初始化，这一部分不需要我们再去实现，因此后续我们重点关注 S 态的 trap 处理。
+trap 给了 OS 与硬件、软件交互的能力。在 **3.1** 中我们介绍了在 RISC-V 中有三种特权级（M 态、S 态、U 态），在 boot 阶段，OpenSBI 已经帮我们将 M 态的 trap 处理进行了初始化，这一部分不需要我们再去实现，因此后续我们重点关注 S 态的 trap 处理。
 
 #### RISC-V 中的 interrupt 和 exception
 ##### 什么是 interrupt 和 exception
 
-!!! abstract "[RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf) 1.6 节中对于 trap、interrupt 与 exception 的描述"
-    We use the term **exception** to refer to an unusual condition occurring at run time **associated with an instruction** in the current RISC-V hart. We use the term **interrupt** to refer to an **external asynchronous event** that may cause a RISC-V hart to experience an unexpected transfer of control. We use the term **trap** to refer to **the transfer of control to a trap handler** caused by either an exception or an interrupt.
+!!! abstract "[RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/unpriv-isa-asciidoc.pdf) 1.6 节中对于 trap、interrupt 与 exception 的描述"
+    We use the term *exception* to refer to an unusual condition occurring at run time **associated with an instruction** in the current RISC-V hart. We use the term *interrupt* to refer to an **external asynchronous event** that may cause a RISC-V hart to experience an unexpected transfer of control. We use the term *trap* to refer to **the transfer of control to a trap handler** caused by either an exception or an interrupt.
 
 总结起来 interrupt 与 exception 的主要区别如下表：
 
@@ -295,26 +320,28 @@ trap 给了 OS 与硬件、软件交互的能力。在 **3.1** 中我们介绍�
 
 ##### 相关寄存器
 
-除了 32 个通用寄存器之外，RISC-V 架构还有大量的 **控制状态寄存器**（Control and Status Registers，CSRs），下面将介绍几个和 trap 机制相关的重要寄存器。
+除了 32 个通用寄存器之外，RISC-V 架构还有大量的**控制状态寄存器**（Control and Status Registers，CSRs），下面将介绍几个和 trap 机制相关的重要寄存器。
 
-Supervisor Mode 下 trap 相关寄寄存器:
+Supervisor Mode 下 trap 相关寄存器:
 
-- `sstatus`（Supervisor Status Register）中存在一个 `SIE`（Supervisor Interrupt Enable）比特位，当该比特位设置为 1 时，会**响应**所有的 S 态 trap， 否则将会禁用所有 S 态 trap。
+- `sstatus`（Supervisor Status Register）中存在一个 `SIE`（Supervisor Interrupt Enable）比特位，当该比特位设置为 1 时，会**响应**所有的 S 态 trap，否则将会禁用所有 S 态 trap。
 - `sie`（Supervisor Interrupt Eable Register），在 RISC-V 中，interrupt 被划分为三类 software interrupt、timer interrupt、external interrupt。在开启了 `sstatus[SIE]` 之后，系统会根据 `sie` 中的相关比特位来决定是否对该 interrupt 进行**处理**。
 - `stvec`（Supervisor Trap Vector Base Address Register）即所谓的“中断向量表基址”。`stvec` 有两种模式：
     - Direct 模式，适用于系统中只有一个中断处理程序，其指向中断处理入口函数（本次实验中我们所用的模式）。
-    - Vectored 模式，指向中断向量表，适用于系统中有多个中断处理程序（该模式可以参考 [RISC-V 内核源码](https://elixir.bootlin.com/linux/latest/source/arch/riscv/kernel/entry.S#L564)）。
+    - Vectored 模式，指向中断向量表，适用于系统中有多个中断处理程序（该模式可以参考 [RISC-V 内核源码](https://elixir.bootlin.com/linux/v6.11/source/arch/riscv/kernel/entry.S#L340)）。
 - `scause`（Supervisor Cause Register），会记录 trap 发生的原因，还会记录该 trap 是 interrupt 还是 exception。
 - `sepc`（Supervisor Exception Program Counter），会记录触发 exception 的那条指令的地址。
 
-Machine Mode 异常相关寄寄存器:
+Machine Mode 异常相关寄存器:
 
 - 类似于 Supervisor Mode，Machine Mode 也有相对应的寄存器，但由于本实验同学不需要操作这些寄存器，故不在此作介绍。
 
 ##### 相关特权指令
 
-- `ecall`（Environment Call），当我们在 S 态执行这条指令时，会触发一个 `ecall-from-s-mode-exception`，从而进入 M Mode 下的处理流程（如设置定时器等）；当我们在 U 态执行这条指令时，会触发一个 `ecall-from-u-mode-exception`，从而进入 S Mode 下的处理流程（常用来进行系统调用）。
-- `sret` 用于 S 态 trap 返回, 通过 `sepc` 来设置 `pc` 的值， 返回到之前程序继续运行。
+- `ecall`（Environment Call）：
+    - 当我们在 S 态执行这条指令时，会触发一个 `ecall-from-s-mode-exception`，从而进入 M Mode 下的处理流程（如设置定时器等）
+    - 当我们在 U 态执行这条指令时，会触发一个 `ecall-from-u-mode-exception`，从而进入 S Mode 下的处理流程（常用来进行系统调用）；
+- `sret` 用于 S 态 trap 返回，通过 `sepc` 来设置 `pc` 的值，返回到之前程序继续运行。
 
 #### 上下文处理
 
@@ -334,8 +361,6 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
     - 因此我们只需要更新 `mtimecmp` 中的值，就可以设置下一次时钟中断的触发点。OpenSBI 已经为我们提供了更新 `mtimecmp` 的接口 `sbi_set_timer`（见 `lab1` 4.2.3 节）。
 - `mcounteren`（Counter-Enable Registers）：
     - 由于 `mtime` 是属于 M 态的寄存器，我们在 S 态无法直接对其读写，幸运的是 OpenSBI 在 M 态已经通过设置 `mcounteren` 寄存器的 `TM` 比特位，让我们可以在 S 态中可以通过 `time` 这个**只读**寄存器读取到 `mtime` 的当前值，相关汇编指令是 `rdtime`。
-
-!!! tip "以上寄存器的详细介绍请同学们参考 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMFDQC-and-Priv-v1.11/riscv-privileged-20190608.pdf)"
 
 ## 实验步骤
 
@@ -359,8 +384,8 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
 │       └── Makefile
 ├── include
 │   ├── printk.h
-|   ├── stddef.h
-│   └── types.h
+│   ├── stddef.h
+│   └── stdint.h
 ├── init
 │   ├── main.c
 │   ├── Makefile
@@ -371,10 +396,10 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
 └── Makefile
 ```
 
-完成 **RV64 内核引导**，需要完善以下文件：
+完成 **RV64 内核引导**，需要完善以下文件，删除 Unimplemented 的提示并完成代码：
 
-- `arch/riscv/kernel/head.S`
 - `lib/Makefile`
+- `arch/riscv/kernel/head.S`
 - `arch/riscv/kernel/sbi.c`
 - `arch/riscv/include/defs.h`
 
@@ -384,21 +409,24 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
 - `arch/riscv/kernel/entry.S`
 - `arch/riscv/kernel/trap.c`
 - `arch/riscv/kernel/clock.c`
+- `arch/riscv/include/clock.h`
+- `arch/riscv/kernel/sbi.c`
 
 ### RV64 内核引导
+
+#### 完善 Makefile 脚本
+
+阅读文档中关于 [GNU Make](#gnu-make) 的章节，以及工程文件中的 Makefile 文件，根据注释学会 Makefile 的使用规则后，补充 `lib/Makefile`，使工程得以编译。
+
+!!! tip "可参考其他文件夹的 Makefile"
+
+完成此步后在工程根文件夹执行 make，可以看到不会再提示 Makefile 的错误，而是 C 或汇编代码中的 `#!c #error` 错误。
+
 #### 编写 head.S
 
 学习 RISC-V 汇编，并完成 `arch/riscv/kernel/head.S`。
 
-我们首先为即将运行的第一个 C 函数设置程序栈（栈的大小可以设置为4KB），并将该栈放置在 `.bss.stack` 段。接下来我们只需要通过跳转指令，跳转至 main.c 中的 `start_kernel` 函数即可。
-
-#### 完善 Makefile 脚本
-
-阅读文档中关于 [Makefile](#makefile) 的章节，以及工程文件中的 Makefile 文件，根据注释学会 Makefile 的使用规则后，补充 `lib/Makefile`，使工程得以编译。
-
-!!! tip "可参考其他文件夹的 Makefile"
-
-完成此步后在工程根文件夹执行 make，可以看到工程成功编译出 vmlinux。
+我们首先为即将运行的第一个 C 函数设置程序栈（栈的大小可以设置为 4KiB），并将该栈放置在 `.bss.stack` 段。接下来我们只需要通过跳转指令，跳转至 main.c 中的 `start_kernel` 函数即可。
 
 #### 补充 sbi.c
 
@@ -406,49 +434,59 @@ OpenSBI 在 M 态，为 S 态提供了多种接口，比如字符串输入输出
 
 ```c
 struct sbiret {
-	long error;
-	long value;
+    uint64_t error;
+    uint64_t value;
 };
 
-struct sbiret sbi_ecall(int ext, int fid, 
-                    uint64 arg0, uint64 arg1, uint64 arg2,
-                    uint64 arg3, uint64 arg4, uint64 arg5);
+struct sbiret sbi_ecall(uint64_t eid, uint64_t fid,
+                        uint64_t arg0, uint64_t arg1, uint64_t arg2,
+                        uint64_t arg3, uint64_t arg4, uint64_t arg5);
 ```
 
-sbi_ecall 函数中，需要完成以下内容：
+`sbi_ecall` 函数中，需要完成以下内容：
 
-1. 将 `ext`（Extension ID）放入寄存器 `a7` 中，`fid`（Function ID）放入寄存器 `a6` 中，将 `arg0` ~ `arg5` 放入寄存器 `a0` ~ `a5` 中。
+1. 将 `eid`（Extension ID）放入寄存器 `a7` 中，`fid`（Function ID）放入寄存器 `a6` 中，将 `arg[0-5]` 放入寄存器 `a[0-5]` 中。
 2. 使用 `ecall` 指令。`ecall` 之后系统会进入 M 模式，之后 OpenSBI 会完成相关操作。
 3. OpenSBI 的返回结果会存放在寄存器 `a0`，`a1` 中，其中 `a0` 为 error code，`a1` 为返回值，我们用 `sbiret` 来接受这两个返回值。
 
 同学们可以参照内联汇编的示例一完成该函数的编写。
 
 ???+ example
-    编写成功后，调用 `sbi_ecall(0x1, 0x0, 0x30, 0, 0, 0, 0, 0)` 将会输出字符 `'0'`，其中：
+    编写成功后，调用 `sbi_ecall(0x4442434E, 0x2, 0x30, 0, 0, 0, 0, 0)` 将会输出字符 `'0'`，其中：
 
-    - `0x1` 代表 `sbi_console_putchar` 的 ExtensionID
-    - `0x0` 代表 FunctionID
+    - `0x4442434E` 代表 Debug Console Extension 的 Extension ID（`DBCN`）
+    - `0x2` 代表 Console Write Byte 的 FunctionID
     - `0x30` 代表 '0' 的 ascii 值
     - 其余参数填 0
 
 请在 `arch/riscv/kernel/sbi.c` 中补充 `sbi_ecall()`。
 
-下面列出了一些在后续的实验中可能需要使用的功能。
+下面列出了一些在后续的实验中可能需要使用的功能，也可以在 `sbi.c` 及 `sbi.h` 中一并实现：
 
-|Function Name | Function ID | Extension ID |
-|---|---|---|
-|sbi_set_timer（设置时钟相关寄存器） |0|0x00| 
-|sbi_console_putchar（打印字符）|0|0x01| 
-|sbi_console_getchar（接收字符）|0|0x02| 
-|sbi_shutdown（关机）|0|0x08| 
+| Function Name | Description | Extension ID | Function ID |
+|---|---|---|---|
+|`sbi_set_timer`|设置时钟相关寄存器|0x54494d45|0| 
+|`sbi_debug_console_write`|向终端写入数据|0x4442434e|0|
+|`sbi_debug_console_read`|从终端读取数据|0x4442434e|1|
+|`sbi_debug_console_write_byte`|向终端写入单个字符|0x4442434e|2|
+|`sbi_system_reset`|重置系统（关机或重启）|0x53525354|0|
+
+关于 OpenSBI 的更多接口，请参考 [RISC-V SBI v2.0 Specification](https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0/riscv-sbi.pdf)。
+
+`printk` 会调用 `putc` 来输出单个字符，而其中调用了 `sbi_debug_console_write_byte`，所以为了使用 `printk` 请在 `sbi.c` 中正确利用 `sbi_ecall` 实现这个函数。
+
+`test.c` 中在 kernel 运行的结尾会调用 `sbi_system_reset(0, 0)` 来 shutdown，所以你也需要在 `sbi.c` 中正确实现 `sbi_system_reset`。
+
+??? note "关于 SBI 版本问题"
+    曾经的实验文档中使用 `sbi_ecall(0x1, 0x0, 0x30, 0, 0, 0, 0, 0)` 达到了和 `sbi_ecall(0x4442434E, 0x2, 0x30, 0, 0, 0, 0, 0)` 一样的效果，并且 `sbi_set_timer` 等函数的 EID 都很小（0x00 - 0x0F），这些实际上都是 v0.1 的旧版 SBI 规范，目前称为 Legacy Extensions，已经弃用很久了。具体可见 [RISC-V Supervisor Binary Interface Specification](https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0/riscv-sbi.pdf) 的 Chapter 5。因此推荐大家均按照本文档要求使用新版 SBI 规范。
 
 #### 修改 defs
 
-内联汇编的相关知识见 [3.1.6 节内联汇编](#_5)。 
+学习了解了内联汇编的相关知识后，补充 `arch/riscv/include/defs.h` 中的代码，完成 `read_csr` 的宏定义。
 
-学习了解了以上知识后，补充 `arch/riscv/include/defs.h` 中 `read_csr` 的宏定义。
+完成以上内容后再次执行 `make`，可以看到在根目录下成功生成了 `vmlinux`。
 
-如果完成到此处，你就已经可以在 qemu 运行 `make` 得到的内核，从而至少完成思考题 1～4 了。
+运行 `make run` 即可执行，检测你的程序是否正确地打印出了欢迎信息 `2024 ZJU Operating System` 并正常退出。
 
 ### RV64 时钟中断处理
 
@@ -456,7 +494,7 @@ sbi_ecall 函数中，需要完成以下内容：
     ```diff title="(diff) arch/riscv/kernel/vmlinux.lds"
     *** 20,25 ****
     --- 20,26 ----
-          .text : ALIGN(0x1000){
+          .text : ALIGN(0x1000) {
               _stext = .;
     
     +         *(.text.init)         <- 添加 .text.init 段
@@ -465,20 +503,16 @@ sbi_ecall 函数中，需要完成以下内容：
     ```
 
     ```diff title="(diff) arch/riscv/kernel/head.S"
-    *** 1,6 ****
-      .extern start_kernel
-      
+    *** 1,4 ****
+          .extern start_kernel
     !     .section .text.entry
           .globl _start
       _start:
-          # ------------------
-    --- 1,6 ----
-      .extern start_kernel
-      
+    --- 1,4 ----
+          .extern start_kernel
     !     .section .text.init       <- 改为 .text.init
           .globl _start
       _start:
-          # ------------------
     ```
 
 #### 开启 trap 处理
@@ -490,50 +524,33 @@ sbi_ecall 函数中，需要完成以下内容：
     !!! tip "可以使用 `la` 指令以及刚才写过的 CSR 读写指令"
 2. 开启时钟中断，将 `sie[STIE]` 置 1
 3. 设置第一次时钟中断，参考 `clock_set_next_event()`（`clock_set_next_event()` 在 4.3.4 中介绍）中的逻辑用汇编实现
-    !!! tip "可通过 `rdtime` 指令获取时间"
-4. 开启 S 态下的中断响应， 将 `sstatus[SIE]` 置 1
+    
+    !!! tip "可通过 `rdtime` 指令获取时间，`sbi_set_timer` 设置下一次时钟中断"
+
+4. 开启 S 态下的中断响应，将 `sstatus[SIE]` 置 1
 
 按照下方模版修改 `arch/riscv/kernel/head.S`，并补全 `_start` 中的逻辑:
 
 ```asm title="arch/riscv/kernel/head.S"
-.extern start_kernel
-
+    .extern start_kernel
     .section .text.init
     .globl _start
 _start:
-    # ----------------------
-    # -  initialize stack  -
-    # ----------------------
+    # (previous) initialize stack
 
-    # YOUR CODE HERE
+    # set stvec = _traps
+    # set sie[STIE] = 1
+    # set first time interrupt
+    # set sstatus[SIE] = 1
 
-    # ----------------------
-        
-        # set stvec = _traps
-    
-    # ----------------------
-    
-        # set sie[STIE] = 1
-    
-    # ----------------------
-    
-        # set first time interrupt
-    
-    # ----------------------
-    
-        # set sstatus[SIE] = 1
-
-    # ----------------------
-    
-    # ----------------------
-    # - your previous code -
-    # ----------------------
-
+    # (previous) jump to start_kernel
     ...
 ```
 
 !!! tip "Debug 提示"
     可以先不实现 `stvec` 和 first time interrupt，先关注 `sie` 和 `sstatus` 是否设置正确。
+
+    如果在这部分过程中调用了额外的函数，例如 `sbi_set_timer`，则你需要保证在这之前已经设置好了 `sp`，否则涉及到函数调用则会直接出现异常。
 
 #### 实现上下文切换
 
@@ -548,28 +565,17 @@ _start:
 按照下方模版修改 `arch/riscv/kernel/entry.S`，并补全 `_traps` 中的逻辑：
 
 ```asm title="arch/riscv/kernel/entry.S"
+    .extern trap_handler
     .section .text.entry
     .align 2
     .globl _traps 
 _traps:
-    # YOUR CODE HERE
-    # -----------
-
-        # 1. save 32 registers and sepc to stack
-
-    # -----------
-
-        # 2. call trap_handler
-
-    # -----------
-
-        # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
-
-    # -----------
-
-        # 4. return from trap
-
-    # -----------
+    #error Unimplemented
+    
+    # 1. save 32 registers and sepc to stack
+    # 2. call trap_handler
+    # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
+    # 4. return from trap
 ```
 
 !!! tip "Debug 提示"
@@ -581,14 +587,16 @@ _traps:
 2. 在 `trap.c` 中实现 trap 处理函数 `trap_handler()`，其接收的两个参数分别是 `scause` 和 `sepc` 两个寄存器中的值。
 
 ```c title="arch/riscv/kernel/trap.c"
-void trap_handler(unsigned long scause, unsigned long sepc) {
+#include "stdint.h"
+
+void trap_handler(uint64_t scause, uint64_t sepc) {
     // 通过 `scause` 判断 trap 类型
     // 如果是 interrupt 判断是否是 timer interrupt
-    // 如果是 timer interrupt 则打印输出相关信息, 并通过 `clock_set_next_event()` 设置下一次时钟中断
+    // 如果是 timer interrupt 则打印输出相关信息，并通过 `clock_set_next_event()` 设置下一次时钟中断
     // `clock_set_next_event()` 见 4.3.4 节
     // 其他 interrupt / exception 可以直接忽略，推荐打印出来供以后调试
     
-    // YOUR CODE HERE
+    #error Unimplemented
 }
 ```
 
@@ -601,30 +609,32 @@ void trap_handler(unsigned long scause, unsigned long sepc) {
     - 调用 `sbi_ecall`，设置下一个时钟中断事件
 
 ```c title="arch/riscv/kernel/clock.c"
+#include "stdint.h"
+
 // QEMU 中时钟的频率是 10MHz，也就是 1 秒钟相当于 10000000 个时钟周期
-unsigned long TIMECLOCK = 10000000;
+uint64_t TIMECLOCK = 10000000;
 
-unsigned long get_cycles() {
+uint64_t get_cycles() {
     // 编写内联汇编，使用 rdtime 获取 time 寄存器中（也就是 mtime 寄存器）的值并返回
-    // YOUR CODE HERE
-
+    #error Unimplemented
 }
 
 void clock_set_next_event() {
     // 下一次时钟中断的时间点
-    unsigned long next = get_cycles() + TIMECLOCK;
+    uint64_t next = get_cycles() + TIMECLOCK;
 
-    // 使用 sbi_ecall 来完成对下一次时钟中断的设置
-    // YOUR CODE HERE
+    // 使用 sbi_set_timer 来完成对下一次时钟中断的设置
+    #error Unimplemented
 } 
-
 ```
 
 #### 修改 test 函数
 
-为了让中断更容易观察，将 `test.c` 中的 `test()` 函数修改为如下形式：
+为了让 kernel 持续运行，并使中断更容易观察，将 `test.c` 中的 `test()` 函数修改为如下内容：
 
 ```c title="init/test.c"
+#include "printk.h"
+
 void test() {
     int i = 0;
     while (1) {
@@ -640,9 +650,11 @@ void test() {
 
 由于加入了一些新的 `.c` 文件，可能需要修改一些 Makefile 文件，请同学自己尝试修改，使项目可以编译并运行。
 
-下面是一个正确实现的输出样例。（仅供参考，实际情况略有不同，可适当调整上面 `test()` 函数中的输出条件）：
+下面是一个正确实现的输出样例。（仅供参考，实际情况可能略有不同，时钟中断输出位置不一样无所谓，也可以适当调整上面 `test()` 函数中的输出条件）：
 
 ```
+2024 ZJU Operating System
+[S] Supervisor Mode Timer Interrupt
 kernel is running!
 [S] Supervisor Mode Timer Interrupt
 kernel is running!
@@ -712,7 +724,7 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- <path/to/file(no suffix)>.i
     - 请列出源代码文件，展示完整的系统调用表（宏展开后），每一步都需要截图。
 7. 阐述什么是 ELF 文件？尝试使用 readelf 和 objdump 来查看 ELF 文件，并给出解释和截图。
     - 运行一个 ELF 文件，然后通过 `cat /proc/PID/maps` 来给出其内存布局并截图。
-8. 在我们使用 make run 时， OpenSBI 会产生如下输出：
+8. 在我们使用 make run 时，OpenSBI 会产生如下输出：
     ```plaintext
         OpenSBI v0.9
          ____                    _____ ____ _____
@@ -731,7 +743,7 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- <path/to/file(no suffix)>.i
 
         ......
     ```
-    - 通过查看 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Priv-v1.12/riscv-privileged-20211203.pdf) 中的 `medeleg` 和 `mideleg` 部分，解释上面 `MIDELEG` 和 `MEDELEG` 值的含义。
+    - 通过查看 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/priv-isa-asciidoc.pdf) 中的 `medeleg` 和 `mideleg` 部分，解释上面 `MIDELEG` 和 `MEDELEG` 值的含义。
 
 ## 实验任务与要求
 

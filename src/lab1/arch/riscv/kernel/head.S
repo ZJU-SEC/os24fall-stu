@@ -2,7 +2,7 @@
     .section .text.entry
     .globl _start
 _start:
-    #error "Unimplemented"
+    #error Unimplemented
     # ------------------
     # - your code here -
     # ------------------

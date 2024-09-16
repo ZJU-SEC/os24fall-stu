@@ -4,7 +4,6 @@ OBJ		    = $(patsubst %.S,%.o,$(ASM_SRC)) $(patsubst %.c,%.o,$(C_SRC))
 
 all:$(OBJ)
 
-
 %.o:%.S
 	${GCC}  ${CFLAG} -c $<
 

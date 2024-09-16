@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __PRINTK_H__
+#define __PRINTK_H__
 
 #include "stddef.h"
 
@@ -7,3 +8,5 @@
 #define false 0
 
 int printk(const char *, ...);
+
+#endif
