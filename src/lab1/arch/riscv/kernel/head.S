@@ -1,8 +1,8 @@
-.extern start_kernel
-
+    .extern start_kernel
     .section .text.entry
     .globl _start
 _start:
+    #error "Unimplemented"
     # ------------------
     # - your code here -
     # ------------------

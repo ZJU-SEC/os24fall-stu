@@ -5,9 +5,9 @@ extern void test();
 
 int start_kernel() {
     printk("2024");
-    printk(" Hello RISC-V\n");
+    printk(" ZJU Operating System\n");
 
     test(); // DO NOT DELETE !!!
 
-	return 0;
+    return 0;
 }
