@@ -20,7 +20,7 @@
 
 #### 前置知识
 
-为了顺利完成 OS 实验，我们需要一些前置知识和较多调试技巧。在 OS 实验中我们需要 **RISC-V汇编**的前置知识，课堂上不会讲授，请同学们通过阅读以下四份文档自学：
+为了顺利完成 OS 实验，我们需要一些前置知识和较多调试技巧。在 OS 实验中我们需要 **RISC-V汇编**的前置知识，课堂上不会讲授，请同学们通过阅读以下几份文档自学：
 
 - [RISC-V Assembly Programmer's Manual](https://github.com/riscv-non-isa/riscv-asm-manual/blob/f8bcdded42ac9108e0bf7cf0789dbe306ec329e2/riscv-asm.md)
 - [RISC-V Unprivileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/Ratified-IMAFDQC/riscv-spec-20191213.pdf)
@@ -341,8 +341,9 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
 
 ### 准备工程
 
-从 [repo](https://github.com/ZJU-SEC/os24fall-stu) 同步实验代码框架。为了减少大家的工作量，在这里我们提供了简化版的 `printk` 来输出格式化字符串。
+从 [repo](https://github.com/ZJU-SEC/os24fall-stu) 同步实验代码框架。为了减少大家的工作量，在这里我们提供了系统二助教 [45gfg9](https://github.com/45gfg9) 编写的 `printk` 来输出格式化字符串。
 
+!!! note "printk 和之前大家用过的 printf 用法一致，遇到什么输出上的 bug 请及时联系助教"
 
 ```
 ├── arch
