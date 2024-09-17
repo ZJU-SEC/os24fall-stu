@@ -372,6 +372,62 @@ trap 处理程序根据 `scause` 的值，进入不同的处理逻辑，在本�
 - `mcounteren`（Counter-Enable Registers）：
     - 由于 `mtime` 是属于 M 态的寄存器，我们在 S 态无法直接对其读写，幸运的是 OpenSBI 在 M 态已经通过设置 `mcounteren` 寄存器的 `TM` 比特位，让我们可以在 S 态中可以通过 `time` 这个**只读**寄存器读取到 `mtime` 的当前值，相关汇编指令是 `rdtime`。
 
+??? note "为什么不要直接读写 `mtimecmp`？"
+
+    同学们在自己尝试或阅读资料（如 [RISC-V Bytes: Timer Interrupts · Daniel Mangum](https://danielmangum.com/posts/risc-v-bytes-timer-interrupts/) 和 [RISC-V Assembly Programmer's Manual#Control and Status Registers](https://github.com/riscv-non-isa/riscv-asm-manual/blob/main/src/asm-manual.adoc#control-and-status-registers)）时可能会直接读写 `mtimecmp` 寄存器来设置时钟中断的方法。然而标准规定 `mtime` 和 `mtimecmp` 是 M 模式下读写的内存映射的寄存器：
+
+    > Platforms provide a real-time counter, exposed as a memory-mapped **machine-mode read-write** register, `mtime`.
+    >
+    > Platforms provide a 64-bit memory-mapped **machine-mode** timer compare register (`mtimecmp`).
+    >
+    > From *The RISC-V Instruction Set Manual: Volume II 3.2.1*
+
+    现在我们在 S 模式，是无法读写这两个寄存器的。如果去读写，就会触发 Store/AMO Access Fault 异常。因此**只能**通过 ecall 交给 `sbi_set_timer` 来设置 `mtimecmp` 的值，从而实现时钟中断的设置。
+
+    ??? note "`sbi_set_timer` 是如何工作的？"
+
+        但如果去读 OpenSBI [源码](https://github.com/riscv-software-src/opensbi/blob/c4940a9517486413cd676fc8032bb55f9d4e2778/lib/sbi/sbi_timer.c#L132)，又会发现它也不是直接写 `mtimecmp` 的，而是写入了 `stimecmp`：
+
+        ```c title="opensbi/lib/sbi/sbi_timer.c"
+        void sbi_timer_event_start(u64 next_event)
+        {
+            sbi_pmu_ctr_incr_fw(SBI_PMU_FW_SET_TIMER);
+
+            /**
+            * Update the stimecmp directly if available. This allows
+            * the older software to leverage sstc extension on newer hardware.
+            */
+            if (sbi_hart_has_extension(sbi_scratch_thishart_ptr(), SBI_HART_EXT_SSTC)) {
+        # if __riscv_xlen == 32
+                csr_write(CSR_STIMECMP, next_event & 0xFFFFFFFF);
+                csr_write(CSR_STIMECMPH, next_event >> 32);
+        # else
+                csr_write(CSR_STIMECMP, next_event);
+        # endif
+            } else if (timer_dev && timer_dev->timer_event_start) {
+                timer_dev->timer_event_start(next_event);
+                csr_clear(CSR_MIP, MIP_STIP);
+            }
+            csr_set(CSR_MIE, MIP_MTIP);
+        }
+        ```
+
+        这是因为 [RISC-V SSTC 扩展](https://tools.cloudbear.ru/docs/riscv-sstc-0.5.4-20211013.pdf)，该扩展的简介也阐明了 RISC-V 各个模式的时钟中断处理机制：
+
+        > The current Privileged arch specification only defines a hardware mechanism for generating machine-mode timer
+        > interrupts (based on the mtime and mtimecmp registers). With the resultant requirement that timer services for
+        > S-mode/HS-mode (and for VS-mode) have to all be provided by M-mode - via SBI calls from S/HS-mode up to
+        > M-mode (or VS-mode calls to HS-mode and then to M-mode).
+        > 
+        > This extension serves to provide supervisor mode with its own CSR-based timer interrupt facility that it can
+        > directly manage to provide its own timer service (in the form of having its own stimecmp register) - thus
+        > eliminating the large overheads for emulating S/HS-mode timers and timer interrupt generation up in M-mode.
+        > Further, this extension adds a similar facility to the Hypervisor extension for VS-mode.
+        >
+        > 总结：在当前 RISC-V 特权架构中，S 模式和 HS 模式的定时器服务需要依赖 M 模式提供，这导致了额外的开销。为了解决这个问题，该扩展引入了 S 模式的独立定时器中断机制，允许 S 模式直接管理自己的定时器，降低了对 M 模式的依赖。此外，VS 模式也获得了类似的功能，简化了定时器的管理和中断生成。
+
+        目前，QEMU 的 RISC-V 模拟器已经支持了 SSTC 扩展，因此我们**可以直接通过 `stimecmp` 来设置时钟中断。但为了兼容性考虑**，仍应当使用 `sbi_set_timer` 来设置时钟中断，这样在 SSTC 扩展不被支持的情况下，将 fallback 到 M 模式下的时钟中断处理机制。
+
 ## 实验步骤
 
 ### 准备工程
