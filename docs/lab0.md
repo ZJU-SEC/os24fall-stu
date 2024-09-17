@@ -180,6 +180,19 @@ $ sudo apt install  autoconf automake autotools-dev curl libmpc-dev libmpfr-dev 
 $ sudo apt install qemu-system-misc
 ```
 
+!!! warning "关于 qemu 版本的更新"
+    由于 Ubuntu 22.04 apt 中的 qemu 只有 6.2 版本，而这个版本下的 OpenSBI 也很老，而且在后续页表等实验中也会有严重的潜在 bug，所以请同学们通过 `qemu-system-riscv64 --version` 自查 qemu 版本，保证其在 8.2.2 及以上（Ubuntu 24.04 apt 中 qemu 为 8.2.2）。如果版本过低，请参考 [QEMU Wiki](https://wiki.qemu.org/Hosts/Linux) 自行编译新版 qemu：
+
+    ```bash
+    git clone https://github.com/qemu/qemu.git
+    cd qemu
+    sudo apt-get install git libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev ninja-build
+    ./configure --target-list=riscv64-softmmu
+    make -j$(nproc)
+    ```
+
+    如果你看到这条内容的时候还没有执行 `sudo apt install qemu-system-misc` 而且正在使用 Ubuntu 22.04，请直接通过上述方式手动编译 qemu。
+
 我们还需要用 `gdb` 来对在 `qemu` 上运行的 Linux 内核进行调试：
 
 ```bash

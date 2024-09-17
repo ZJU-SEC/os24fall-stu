@@ -13,8 +13,18 @@
 
 - Environment in Lab0
 
-## 实验基础知识介绍
+!!! warning "关于 qemu 版本的更新"
+    由于 Ubuntu 22.04 apt 中的 qemu 只有 6.2 版本，而这个版本下的 OpenSBI 也很老，而且在后续页表等实验中也会有严重的潜在 bug，所以请同学们通过 `qemu-system-riscv64 --version` 自查 qemu 版本，保证其在 8.2.2 及以上（Ubuntu 24.04 apt 中 qemu 为 8.2.2）。如果版本过低，请参考 [QEMU Wiki](https://wiki.qemu.org/Hosts/Linux) 自行编译新版 qemu：
 
+    ```bash
+    git clone https://github.com/qemu/qemu.git
+    cd qemu
+    sudo apt-get install git libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev ninja-build
+    ./configure --target-list=riscv64-softmmu
+    make -j$(nproc)
+    ```
+
+## 实验基础知识介绍
 
 ### RV64 内核引导
 
@@ -480,6 +490,13 @@ struct sbiret sbi_ecall(uint64_t eid, uint64_t fid,
 ??? note "关于 SBI 版本问题"
     曾经的实验文档中使用 `sbi_ecall(0x1, 0x0, 0x30, 0, 0, 0, 0, 0)` 达到了和 `sbi_ecall(0x4442434E, 0x2, 0x30, 0, 0, 0, 0, 0)` 一样的效果，并且 `sbi_set_timer` 等函数的 EID 都很小（0x00 - 0x0F），这些实际上都是 v0.1 的旧版 SBI 规范，目前称为 Legacy Extensions，已经弃用很久了。具体可见 [RISC-V Supervisor Binary Interface Specification](https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v2.0/riscv-sbi.pdf) 的 Chapter 5。因此推荐大家均按照本文档要求使用新版 SBI 规范。
 
+!!! warning "`sbi_ecall` 正确执行但仍没有输出的问题处理"
+    如果你的 `sbi_ecall` 函数正确执行了，但是没有任何效果，可能是使用的 OpenSBI 版本过低。如果你还在使用从 Ubuntu 22.04 apt 直接安装的 qemu 的话很可能是这个问题。OpenSBI v1.3 及以上才开始支持这些 SBI 调用，所以你可以在 `make run` 后观察 OpenSBI banner 前的版本号来自查，如果小于 v1.3 的话，那么你就需要更新 qemu 或者 opensbi 了。
+
+    最好的解决办法是根据本页[实验环境](#_2)部分手动编译最新版 qemu，新版 qemu 的 default bios 就是较新版本的 OpenSBI（目前是 v1.5.1），而且更新 qemu 也会消除掉后续实验中的很多潜在 bug。
+
+    如果你实在不想更新 qemu，也可以尝试更新 OpenSBI，即不使用 `-bios default`，我们提供了一个 v1.5 的 OpenSBI 在 `src/lab1/fw_jump.bin`，你可以通过将 `-bios default` 替换为 `-bios fw_jump.bin` 来使用它。你也可以通过 [OpenSBI README](https://github.com/riscv-software-src/opensbi) 的指导来自行编译出这个 `fw_jump.bin`。
+
 #### 修改 defs
 
 学习了解了内联汇编的相关知识后，补充 `arch/riscv/include/defs.h` 中的代码，完成 `read_csr` 的宏定义。
@@ -726,7 +743,7 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- <path/to/file(no suffix)>.i
     - 运行一个 ELF 文件，然后通过 `cat /proc/PID/maps` 来给出其内存布局并截图。
 8. 在我们使用 make run 时，OpenSBI 会产生如下输出：
     ```plaintext
-        OpenSBI v0.9
+        OpenSBI v1.5.1
          ____                    _____ ____ _____
         / __ \                  / ____|  _ \_   _|
        | |  | |_ __   ___ _ __ | (___ | |_) || |
