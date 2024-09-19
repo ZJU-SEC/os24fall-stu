@@ -7,10 +7,17 @@
 - 熟悉GDB和QEMU联合调试
 
 ## 实验环境
-由于 [Ubuntu 24.04](https://ubuntu.com/blog/tag/ubuntu-24-04-lts) 暂时没有推出 arm 版本，使用 Mac with Apple Silicon 的同学可能无法使用 Ubuntu 24.04 进行实验，所以我们仍然沿用 Ubuntu 22.04。
 
-- [Ubuntu 22.04.4 LTS](https://releases.ubuntu.com/jammy/)
-- [Ubuntu 22.04.2 LTS Windows Subsystem for Linux 2](https://www.microsoft.com/store/productId/9PN20MSR04DW)
+实验文档已在 Ubuntu 24.04（包括 x86-64 和 arm64）上测试通过，我们建议同学们使用 Ubuntu 24.04 作为实验环境。
+
+- [Ubuntu 24.04 LTS - Ubuntu](https://releases.ubuntu.com/noble)
+- [Ubuntu 24.04 LTS - ZJU Mirror](https://mirrors.zju.edu.cn/ubuntu-releases/24.04/)
+- [Ubuntu 24.04 LTS Windows Subsystem for Linux 2 - Microsoft Store](https://apps.microsoft.com/detail/9nz3klhxdjp5)
+- [Ubuntu 24.04 - Docker](https://hub.docker.com/layers/library/ubuntu/noble/images/sha256-77d57fd89366f7d16615794a5b53e124d742404e20f035c22032233f1826bd6a?context=explore)
+
+!!! tip "更换 ZJU Mirror 镜像源"
+
+    为了加快 APT 更新速度，建议同学们将 APT 镜像源更换到 [ZJU Mirror](https://mirrors.zju.edu.cn/docs/ubuntu/)。操作过程见相应页面的指南。
 
 !!! tip
     毕竟是交叉编译+使用 qemu，所以只要你配得起来跑得起来，任何环境都可以，只不过我们**不提供环境上的技术支持**。
