@@ -10,6 +10,12 @@
 
 实验文档已在 Ubuntu 24.04（包括 x86-64 和 arm64）上测试通过，建议同学们使用 Ubuntu 24.04（noble）作为实验环境。
 
+!!! tip "升级到 Ubuntu 24.04"
+
+    已经安装 Ubuntu 22.04 或更旧版本的同学可以选择参考 [faq](faq.md#如何升级到-ubuntu-2404) 进行升级。
+
+    升级后，APT 会自动将 QEMU 等软件包升级到仓库中较新的版本。
+
 - [Ubuntu 24.04 LTS - Ubuntu](https://releases.ubuntu.com/noble)
 - [Ubuntu 24.04 LTS - ZJU Mirror](https://mirrors.zju.edu.cn/ubuntu-releases/24.04/)
 - [Ubuntu 24.04 LTS Windows Subsystem for Linux 2 - Microsoft Store](https://apps.microsoft.com/detail/9nz3klhxdjp5)
