@@ -13,7 +13,7 @@
 
 - Environment in Lab0
 
-!!! warning "关于 qemu 版本的更新"
+!!! warning "Ubuntu 22.04 可能遇到兼容性问题"
     由于 Ubuntu 22.04 apt 中的 qemu 只有 6.2 版本，而这个版本下的 OpenSBI 也很老，而且在后续页表等实验中也会有严重的潜在 bug，所以请同学们通过 `qemu-system-riscv64 --version` 自查 qemu 版本，保证其在 8.2.2 及以上（Ubuntu 24.04 apt 中 qemu 为 8.2.2）。如果版本过低，请参考 [QEMU Wiki](https://wiki.qemu.org/Hosts/Linux) 自行编译新版 qemu：
 
     ```bash
