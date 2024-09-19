@@ -66,20 +66,38 @@ Breakpoint 1, 0x000000008000babe in _never_gonna_give_you_up ()
 
 可能你在配置内核时已经添加了调试信息，但是并没有在**QEMU运行的其他部分**添加。例如 SRAM 中对 `march` 进行配置的过程，以及 opensbi 中的所有部分，都缺少调试信息。所以才无法按照函数的层级进行调试。我们在实验中没有对这部分内容作要求，可以自行 Google 探索。
 
-<!-- ## 为什么我在 `start_kernel` 处不能正常使用断点？
-
-在以下版本中，这个断点能够正常被打上并触发
-
-```
-GNU gdb (Ubuntu 12.0.90-0ubuntu1) 12.0.90
-QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.3)
-RISC-V GNU Toolchain (Ubuntu 11.2.0-16ubuntu1) 11.2.0
-linux-6.0-rc5/linux-5.19.9
-``` -->
-
 ## 为什么 Lab1 中我的 C 语言函数的参数无法正确传入？
 
 确认自己是否在 `head.S` 里的 `_start` 函数中正确设置了 `sp`，正常情况下它的值应该是 `0x8020XXXX`。未设置或设置错 `sp` 会使栈上的值不正确且无法写入。
+
+## 如何升级到 Ubuntu 24.04
+
+请按照 [How to upgrade - Ubuntu](https://ubuntu.com/server/docs/how-to-upgrade-your-release) 或 [DebianUpgrade - Debian Wiki](https://wiki.debian.org/DebianUpgrade) 的说明进行升级，所需命令概括如下（使用两种方式之一即可）：
+
+- 使用 Ubuntu 特有的 `do-release-upgrade` 命令：
+
+    ```shell
+    sudo apt update
+    sudo apt upgrade
+    sudo apt full-upgrade
+    sudo do-release-upgrade
+    ```
+
+- 使用 Debian 标准的升级流程：
+
+    ```shell
+    sudo apt-get update
+    sudo apt-get upgrade
+    sudo apt-get full-upgrade
+    # 修改 APT 源
+    sudo apt-get clean
+    sudo apt-get update
+    sudo apt-get upgrade
+    sudo apt-get full-upgrade
+    sudo apt-get autoremove
+    ```
+
+升级完成后，务必尽快重启，不论是物理机还是虚拟机（WSL、Docker）。
 
 <!--
 ## 为什么我的 QEMU 会 “卡住”？

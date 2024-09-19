@@ -7,10 +7,23 @@
 - 熟悉GDB和QEMU联合调试
 
 ## 实验环境
-由于 [Ubuntu 24.04](https://ubuntu.com/blog/tag/ubuntu-24-04-lts) 暂时没有推出 arm 版本，使用 Mac with Apple Silicon 的同学可能无法使用 Ubuntu 24.04 进行实验，所以我们仍然沿用 Ubuntu 22.04。
 
-- [Ubuntu 22.04.4 LTS](https://releases.ubuntu.com/jammy/)
-- [Ubuntu 22.04.2 LTS Windows Subsystem for Linux 2](https://www.microsoft.com/store/productId/9PN20MSR04DW)
+实验文档已在 Ubuntu 24.04（包括 x86-64 和 arm64）上测试通过，建议同学们使用 Ubuntu 24.04（noble）作为实验环境。
+
+!!! tip "升级到 Ubuntu 24.04"
+
+    已经安装 Ubuntu 22.04 或更旧版本的同学可以选择参考 [常见问题及解答 - 如何升级到 Ubuntu 24.04](faq.md#ubuntu-2404) 进行升级。
+
+    升级后，APT 会自动将 QEMU 等软件包升级到仓库中较新的版本。
+
+- [Ubuntu 24.04 LTS - Ubuntu](https://releases.ubuntu.com/noble)
+- [Ubuntu 24.04 LTS - ZJU Mirror](https://mirrors.zju.edu.cn/ubuntu-releases/24.04/)
+- [Ubuntu 24.04 LTS Windows Subsystem for Linux 2 - Microsoft Store](https://apps.microsoft.com/detail/9nz3klhxdjp5)
+- [Ubuntu 24.04 - Docker](https://hub.docker.com/layers/library/ubuntu/noble/images/sha256-77d57fd89366f7d16615794a5b53e124d742404e20f035c22032233f1826bd6a?context=explore)
+
+!!! tip "更换 ZJU Mirror 镜像源"
+
+    为了加快 APT 更新速度，建议同学们将 APT 镜像源更换到 [ZJU Mirror](https://mirrors.zju.edu.cn/docs/ubuntu/)。操作过程见相应页面的指南。
 
 !!! tip
     毕竟是交叉编译+使用 qemu，所以只要你配得起来跑得起来，任何环境都可以，只不过我们**不提供环境上的技术支持**。
@@ -154,7 +167,7 @@ $ make ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu-  # 编译 RISC-V 平台内核
 
     Docker Desktop 的安装可以参考 [Docker Desktop for Apple silicon](https://docs.docker.com/desktop/mac/apple-silicon/)。
 
-    之后使用 `docker pull ubuntu:22.04 && docker run -it --name <some-name> ubuntu:22.04 bash` 来启动一个运行在虚拟机上的 Ubuntu for ARM 容器，并将这个 Ubuntu 作为实验环境。
+    之后使用 `docker pull ubuntu:noble && docker run -it --name <some-name> ubuntu:noble bash` 来启动一个运行在虚拟机上的 Ubuntu for ARM 容器，并将这个 Ubuntu 作为实验环境。
 
 !!! tip "关于 docker 源"
     由于 dockerhub 官方源在国内已无法访问，需要使用 docker 的同学可以自行通过代理解决，或者参考 [CF-Workers-docker.io](https://github.com/cmliu/CF-Workers-docker.io) 使用一些第三方镜像源。
@@ -180,7 +193,7 @@ $ sudo apt install  autoconf automake autotools-dev curl libmpc-dev libmpfr-dev 
 $ sudo apt install qemu-system-misc
 ```
 
-!!! warning "关于 qemu 版本的更新"
+!!! warning "Ubuntu 22.04 可能遇到兼容性问题"
     由于 Ubuntu 22.04 apt 中的 qemu 只有 6.2 版本，而这个版本下的 OpenSBI 也很老，而且在后续页表等实验中也会有严重的潜在 bug，所以请同学们通过 `qemu-system-riscv64 --version` 自查 qemu 版本，保证其在 8.2.2 及以上（Ubuntu 24.04 apt 中 qemu 为 8.2.2）。如果版本过低，请参考 [QEMU Wiki](https://wiki.qemu.org/Hosts/Linux) 自行编译新版 qemu：
 
     ```bash
