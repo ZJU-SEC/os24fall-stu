@@ -1,0 +1,13 @@
+SPIKE_CONFIG=/path/to/repo/src/spike
+
+spike_run: all
+	@echo Launch the spike ......
+	@spike --kernel=arch/riscv/boot/Image --real-time-clint $(SPIKE_CONFIG)/fw_jump.elf
+
+spike_debug: all
+	@echo Launch the spike for debug ......
+	@spike -H --rbb-port=9824 --kernel=arch/riscv/boot/Image $(SPIKE_CONFIG)/fw_jump.elf
+
+spike_bridge:
+	@echo Launch the OpenOCD ......
+	@openocd -f $(SPIKE_CONFIG)/openocd.cfg
