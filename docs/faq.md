@@ -36,6 +36,34 @@
     - 思考题占有一定的分值，需要认真回答
     - 请保持实验报告清晰、简洁
 
+## 如何升级到 Ubuntu 24.04
+
+请按照 [How to upgrade - Ubuntu](https://ubuntu.com/server/docs/how-to-upgrade-your-release) 或 [DebianUpgrade - Debian Wiki](https://wiki.debian.org/DebianUpgrade) 的说明进行升级，所需命令概括如下（使用两种方式之一即可）：
+
+- 使用 Ubuntu 特有的 `do-release-upgrade` 命令
+
+    ```shell
+    sudo apt update
+    sudo apt upgrade
+    sudo do-release-upgrade
+    ```
+
+- 使用 Debian 标准的升级流程：
+
+    ```shell
+    sudo apt-get update
+    sudo apt-get upgrade
+    sudo apt-get full-upgrade
+    # 修改 APT 源
+    sudo apt-get clean
+    sudo apt-get update
+    sudo apt-get upgrade
+    sudo apt-get full-upgrade
+    sudo apt-get autoremove
+    ```
+
+升级完成后，务必尽快重启，不论是物理机还是虚拟机（WSL、Docker）。
+
 ## 为什么我把 Linux 源码放在共享文件夹或 wsl2 的 `/mnt` 下编译不出来？
 
 这种情况下，Linux 在使用 Windows 上的文件系统。请使用 `wget` 等工具将 Linux 源码下载至容器内目录**而非共享目录或 `/mnt` 目录下的任何位置**，然后执行编译。
