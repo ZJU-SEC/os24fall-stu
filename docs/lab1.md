@@ -570,9 +570,7 @@ struct sbiret sbi_ecall(uint64_t eid, uint64_t fid,
 ### RV64 时钟中断处理
 
 * 准备工作，先修改 `vmlinux.lds` 以及 `head.S`
-    ```diff title="(diff) arch/riscv/kernel/vmlinux.lds"
-    *** 20,25 ****
-    --- 20,26 ----
+    ```diff title="(diff) arch/riscv/kernel/vmlinux.lds" linenums="20"
           .text : ALIGN(0x1000) {
               _stext = .;
     
@@ -581,15 +579,9 @@ struct sbiret sbi_ecall(uint64_t eid, uint64_t fid,
               *(.text .text.*)
     ```
 
-    ```diff title="(diff) arch/riscv/kernel/head.S"
-    *** 1,4 ****
+    ```diff title="(diff) arch/riscv/kernel/head.S" linenums="1"
           .extern start_kernel
-    !     .section .text.entry
-          .globl _start
-      _start:
-    --- 1,4 ----
-          .extern start_kernel
-    !     .section .text.init       <- 改为 .text.init
+    !     .section .text.init       <- .text.entry 改为 .text.init
           .globl _start
       _start:
     ```
