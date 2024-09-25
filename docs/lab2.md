@@ -236,7 +236,7 @@ void dummy();
         //      task[i].counter  = 0;
         //      task[i].priority = rand() 产生的随机数（控制范围在 [PRIORITY_MIN, PRIORITY_MAX] 之间）
         // 3. 为 task[1] ~ task[NR_TASKS - 1] 设置 thread_struct 中的 ra 和 sp
-        //     - ra 设置为 __dummy（见 4.3.2）的地址
+        //     - ra 设置为 __dummy（见 4.2.2）的地址
         //     - sp 设置为该线程申请的物理页的高地址
 
         /* YOUR CODE HERE */
@@ -310,7 +310,9 @@ void dummy();
         ret
     ```
 
-    !!! tip "Debug 提示：在 `NR_TASKS = 1+1` 时，可以尝试是否可以从 idle 正确切换到 process 1"
+    !!! tip "Debug 提示"
+        - 在 `NR_TASKS = 1+1` 时，可以尝试是否可以从 idle 正确切换到 process 1
+        - 注意在切换过程中的 pc 变化，且注意 `current` 的更新
 
 #### 实现调度入口函数
 
@@ -567,7 +569,7 @@ void schedule() {
 - 在学在浙大中提交：
     - 整个工程代码的压缩包（提交之前请使用 `make clean` 清除所有构建产物）
     - pdf 格式的实验报告：
-        - 记录实验过程并截图（4.1-4.4），并对每一步的命令以及结果进行必要的解释；
+        - 记录实验过程并截图（4.1-4.3），并对每一步的命令以及结果进行必要的解释；
         - 记录遇到的问题和心得体会；
         - 完成思考题。
 

@@ -26,7 +26,7 @@ void task_init() {
     //      task[i].counter  = 0;
     //      task[i].priority = rand() 产生的随机数（控制范围在 [PRIORITY_MIN, PRIORITY_MAX] 之间）
     // 3. 为 task[1] ~ task[NR_TASKS - 1] 设置 thread_struct 中的 ra 和 sp
-    //     - ra 设置为 __dummy（见 4.3.2）的地址
+    //     - ra 设置为 __dummy（见 4.2.2）的地址
     //     - sp 设置为该线程申请的物理页的高地址
 
     /* YOUR CODE HERE */

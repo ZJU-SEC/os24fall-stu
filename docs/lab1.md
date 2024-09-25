@@ -677,7 +677,7 @@ void trap_handler(uint64_t scause, uint64_t sepc) {
 2. 在 `clock.c` 中实现 `get_cycles()`
     - 使用 `rdtime` 汇编指令获得当前 `time` 寄存器中的值
 3. 在 `clock.c` 中实现 `clock_set_next_event()`
-    - 调用 `sbi_ecall`，设置下一个时钟中断事件
+    - 调用 `sbi_set_timer`，设置下一个时钟中断事件
 
 ```c title="arch/riscv/kernel/clock.c"
 #include "stdint.h"
