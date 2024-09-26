@@ -233,8 +233,8 @@ void dummy();
 
         // 1. 参考 idle 的设置，为 task[1] ~ task[NR_TASKS - 1] 进行初始化
         // 2. 其中每个线程的 state 为 TASK_RUNNING, 此外，counter 和 priority 进行如下赋值：
-        //      task[i].counter  = 0;
-        //      task[i].priority = rand() 产生的随机数（控制范围在 [PRIORITY_MIN, PRIORITY_MAX] 之间）
+        //     - counter  = 0;
+        //     - priority = rand() 产生的随机数（控制范围在 [PRIORITY_MIN, PRIORITY_MAX] 之间）
         // 3. 为 task[1] ~ task[NR_TASKS - 1] 设置 thread_struct 中的 ra 和 sp
         //     - ra 设置为 __dummy（见 4.2.2）的地址
         //     - sp 设置为该线程申请的物理页的高地址
@@ -349,12 +349,12 @@ void schedule() {
 
 - 由于加入了一些新的 .c 文件，可能需要修改一些 Makefile 文件，请同学自己尝试修改，使项目可以编译并运行；
 - 为了验证算法正确性，本次实验加入了一个测试样例（在 4 个线程的情况下的 pid 输出）
-    - 测试会在编译时定义了 `TEST_SCHED` 的情况下进行，所以需要修改 Makefile：
+    - 测试会在编译时定义了 `TEST_SCHED` 且值不为 0 的情况下进行（[Conditional inclusion](https://en.cppreference.com/w/c/preprocessor/conditional)），所以需要修改 Makefile：
         ```makefile
         TEST_SCHED	:=	0
-        CFLAG	:=	$(CF) $(INCLUDE) $(shell test $(TEST_SCHED) -eq 1 && echo -DTEST_SCHED)
+        CFLAG	:=	$(CF) $(INCLUDE) -DTEST_SCHED=$(TEST_SCHED)
         ```
-    - 这样 `make TEST_SCHED=1 run` 的情况下就会给编译加上 `-DTEST_SCHED` 的选项，从而进行测试
+    - 这样 `make TEST_SCHED=1 run` 的情况下就会给编译加上 `-DTEST_SCHED=1` 的选项，从而进行测试
 
 一切均正常实现后得到的结果应该如下：
 
@@ -543,27 +543,10 @@ void schedule() {
 ## 思考题
 
 1. 在 RV64 中一共有 32 个通用寄存器，为什么 `__switch_to` 中只保存了 14 个？
-2. 当线程第一次调用时，其 `ra` 所代表的返回点是 `__dummy`，那么在之后的线程调用中 `__switch_to` 中，`ra` 保存/恢复的函数返回点是什么呢？请同学用 gdb 尝试追踪一次完整的线程切换流程，并关注每一次 `ra` 的变换（需要截图）。
-3. 阅读并理解 `arch/riscv/kernel/mm.c` 代码，尝试说明 `mm_init` 函数都做了什么，以及在 `kalloc` 和 `kfree` 的时候内存是如何被管理的。
-4. 请尝试分析 kernel 从启动到运行到输出两次 `switch to` 为止的栈变化以及内存中存在的函数帧栈布局，简要画图说明。
-    - 可通过 gdb 调试使用 `backtrace` 等指令辅助分析。
-
-<!-- 3. 运行课堂 demo 的 `hello-lkm` 代码，回答下列问题:
-
-    a. 对运行结果进行截图，展示同一进程内的线程哪些数据 share，哪些不 share
-    
-    b. 安装 lkm 和 remove lkm 的命令分别是什么? 对内核进行了哪些改动?
-    
-    c. 使用哪个内核函数可以输出到内核 log?
-    
-    > 特别地，如果你正在使用 `WSL2` 上的 `Ubuntu 22.04`，由于官方和浙大源中都没有给出对应版本的 `linux-headers`，所以需要我们从 Linux 源码开始编译 kernel module。你可以从微软的官方 [WSL2 Kernel Repository](https://github.com/microsoft/WSL2-Linux-Kernel) 中获取到你正在使用的 WSL2 内核版本对应的源码。
-
-    > 例如我通过 `uname -r` 得到的结果是 `5.10.16.3-microsoft-standard-WSL2`，就需要从这个 Repo 的 [tags](https://github.com/microsoft/WSL2-Linux-Kernel#:~:text=8%20branches-,3%2C144%20tags,-Go%20to%20file) 中找到 [linux-msft-wsl-5.10.16.3](https://github.com/microsoft/WSL2-Linux-Kernel/tags#:~:text=linux%2Dmsft%2Dwsl%2D5.10.16.3) 的源码并下载解压。
-
-    > 在编译 `lkm` 之前，需要首先编译 Linux 内核，我们可以使用命令 `zcat /proc/config.gz > .config` 来将当前运行的内核的配置直接复制到内核仓库中，然后直接进行 `make`。如果在编译的过程中遇到了部分选项没有配置的提示，可以一直敲回车来选择默认选项。
-
-    > 在编译完成以后，你需要阅读我们给出的 `lkm` 的 `Makefile` 来理解其具体行为，并将编译进行的目录指定为我们刚刚的内核目录（即是刚刚我们解压完成的名为 `WSL2-Linux-Kernel-linux-msft-wsl-5.10.16.3`，并进行了内核编译的目录），注意不用带上后面的 `build` 子目录路径，即可完成编译。 -->
-
+2. 阅读并理解 `arch/riscv/kernel/mm.c` 代码，尝试说明 `mm_init` 函数都做了什么，以及在 `kalloc` 和 `kfree` 的时候内存是如何被管理的。
+3. 当线程第一次调用时，其 `ra` 所代表的返回点是 `__dummy`，那么在之后的线程调用中 `__switch_to` 中，`ra` 保存/恢复的函数返回点是什么呢？请同学用 gdb 尝试追踪一次完整的线程切换流程，并关注每一次 `ra` 的变换（需要截图）。
+4. 请尝试分析并画图说明 kernel 运行到输出第两次 `switch to [PID ...` 的时候内存中存在的全部函数帧栈布局。
+    - 可通过 gdb 调试使用 `backtrace` 等指令辅助分析，注意分析第一次时钟中断触发后的 `pc` 和 `sp` 的变化。
 
 ## 实验任务与要求
 
