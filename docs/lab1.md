@@ -341,7 +341,7 @@ trap 给了 OS 与硬件、软件交互的能力。在 **3.1** 中我们介绍�
 Supervisor Mode 下 trap 相关寄存器:
 
 - `sstatus`（Supervisor Status Register）中存在一个 `SIE`（Supervisor Interrupt Enable）比特位，当该比特位设置为 1 时，会**响应**所有的 S 态 trap，否则将会禁用所有 S 态 trap。
-- `sie`（Supervisor Interrupt Eable Register），在 RISC-V 中，interrupt 被划分为三类 software interrupt、timer interrupt、external interrupt。在开启了 `sstatus[SIE]` 之后，系统会根据 `sie` 中的相关比特位来决定是否对该 interrupt 进行**处理**。
+- `sie`（Supervisor Interrupt Enable Register），在 RISC-V 中，interrupt 被划分为三类 software interrupt、timer interrupt、external interrupt。在开启了 `sstatus[SIE]` 之后，系统会根据 `sie` 中的相关比特位来决定是否对该 interrupt 进行**处理**。
 - `stvec`（Supervisor Trap Vector Base Address Register）即所谓的“中断向量表基址”。`stvec` 有两种模式：
     - Direct 模式，适用于系统中只有一个中断处理程序，其指向中断处理入口函数（本次实验中我们所用的模式）。
     - Vectored 模式，指向中断向量表，适用于系统中有多个中断处理程序（该模式可以参考 [RISC-V 内核源码](https://elixir.bootlin.com/linux/v6.11/source/arch/riscv/kernel/entry.S#L340)）。
