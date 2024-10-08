@@ -70,6 +70,14 @@ Breakpoint 1, 0x000000008000babe in _never_gonna_give_you_up ()
 
 确认自己是否在 `head.S` 里的 `_start` 函数中正确设置了 `sp`，正常情况下它的值应该是 `0x8020XXXX`。未设置或设置错 `sp` 会使栈上的值不正确且无法写入。
 
+!!! tip 注意检查是否将 `head.S` 里的 `.section` 改为 `.text.init`，如果不改的话 `_traps` 和 `_start` 都在 `.text.entry` 段，此时 `_traps` 会被放置到 `0x80200000` 处，导致其先于 `_start` 执行；而此时还未设置 `sp`，故传参时会出现混乱（具体表现为 `trap_handler` 的所有参数均显示 `2^64-1`）。
+
+## 不会找 Lab1 的 syscall table 怎么办？
+
+主要有两种方法，一种是安装该架构的交叉编译工具链并编译得到预处理产物，另一种则是在某些文件中直接就有现成的 syscall table. 无论选用哪种方法都要善用搜索，查找系统调用具体放在哪个文件中。可以参考[这篇文章](https://unix.stackexchange.com/questions/421750/where-do-you-find-the-syscall-table-for-linux)。
+
+!!! tip 或许可以直接去 `arch` 对应架构文件夹下搜索关键词？
+
 ## 如何升级到 Ubuntu 24.04
 
 请按照 [How to upgrade - Ubuntu](https://ubuntu.com/server/docs/how-to-upgrade-your-release) 或 [DebianUpgrade - Debian Wiki](https://wiki.debian.org/DebianUpgrade) 的说明进行升级，所需命令概括如下（使用两种方式之一即可）：
