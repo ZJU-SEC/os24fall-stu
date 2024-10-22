@@ -38,7 +38,7 @@ start_address             end_address
 
 具体的虚拟内存布局可以[参考这里](https://elixir.bootlin.com/linux/v5.15/source/Documentation/riscv/vm-layout.rst)。
 
-!!! note 在 `RISC-V Linux Kernel Space` 中有一段虚拟地址空间中的区域被称为 `direct mapping area`，为了方便访问内存，内核会预先把所有物理内存都映射至这一块区域，这种映射也被称为 `linear mapping`，因为该映射方式就是在物理地址上添加一个偏移，使得 `VA = PA + PA2VA_OFFSET`。在 RISC-V Linux Kernel 中这一段区域为 `0xffffffe000000000 ~ 0xffffffff00000000`，共 124 GB 。
+!!! note "在 `RISC-V Linux Kernel Space` 中有一段虚拟地址空间中的区域被称为 `direct mapping area`，为了方便访问内存，内核会预先把所有物理内存都映射至这一块区域，这种映射也被称为 `linear mapping`，因为该映射方式就是在物理地址上添加一个偏移，使得 `VA = PA + PA2VA_OFFSET`。在 RISC-V Linux Kernel 中这一段区域为 `0xffffffe000000000 ~ 0xffffffff00000000`，共 124 GB 。"
 
 
 ### RISC-V Virtual-Memory System (Sv39)
@@ -284,7 +284,7 @@ boot_stack:
 
 
 
-!!! tip 调试小寄巧:
+!!! tip "调试小寄巧"
     - `sfence.vma` 指令用于刷新 TLB
     - `fence.i` 指令用于刷新 icache
     - 在设置好 `satp` 寄存器之前，我们只可以使用**物理地址**来打断点（因为符号表、`vmlinux.lds` 里面记录的函数名的地址都是虚拟地址。在设置好 `satp` 之前，这样子打断点，会与真实的地址相差一个 `PA2VA_OFFSET`）。设置 satp 之后，才可以使用虚拟地址打断点，同时之前设置的物理地址断点也会失效，需要删除
