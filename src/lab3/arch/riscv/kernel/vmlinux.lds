@@ -14,6 +14,11 @@ VM_END       = (0xffffffff00000000);
 VM_SIZE      = (VM_END - VM_START);
 PA2VA_OFFSET = (VM_START - PHY_START);
 
+MEMORY {
+    ram  (wxa!ri): ORIGIN = PHY_START + OPENSBI_SIZE, LENGTH = PHY_SIZE - OPENSBI_SIZE
+    ramv (wxa!ri): ORIGIN =  VM_START + OPENSBI_SIZE, LENGTH =  VM_SIZE - OPENSBI_SIZE
+}
+
 /* kernel 代码起始位置 */
 BASE_ADDR = VM_START + OPENSBI_SIZE;
 
