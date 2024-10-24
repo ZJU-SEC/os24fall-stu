@@ -268,9 +268,9 @@ satp（Supervisor Address Translation and Protection Register）是 RISC-V 中�
 
 ```c title="arch/riscv/kernel/vm.c"
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
-unsigned long early_pgtbl[512] __attribute__((__aligned__(0x1000)));
+uint64_t early_pgtbl[512] __attribute__((__aligned__(0x1000)));
 
-void setup_vm(void) {
+void setup_vm() {
     /* 
      * 1. 由于是进行 1GiB 的映射，这里不需要使用多级页表 
      * 2. 将 va 的 64bit 作为如下划分： | high bit | 9 bit | 30 bit |
@@ -361,9 +361,9 @@ boot_stack:
 
 ```c title="arch/riscv/kernel/vm.c"
 /* swapper_pg_dir: kernel pagetable 根目录，在 setup_vm_final 进行映射 */
-unsigned long  swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+uint64_t swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 
-void setup_vm_final(void) {
+void setup_vm_final() {
     memset(swapper_pg_dir, 0x0, PGSIZE);
 
     // No OpenSBI mapping required
@@ -392,7 +392,7 @@ void setup_vm_final(void) {
 
 /* 创建多级页表映射关系 */
 /* 不要修改该接口的参数和返回值 */
-void create_mapping(uint64 *pgtbl, uint64 va, uint64 pa, uint64 sz, uint64 perm) {
+void create_mapping(uint64_t *pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint64_t perm) {
     /*
      * pgtbl 为根页表的基地址
      * va, pa 为需要映射的虚拟地址、物理地址
