@@ -203,18 +203,12 @@ satp（Supervisor Address Translation and Protection Register）是 RISC-V 中�
     ```
     .
     └── arch
-        └── riscv
-            └── kernel
-                └── vmlinux.lds
+        └── riscv
+            └── kernel
+                └── vmlinux.lds
     ```
     - 新的链接脚本中的 `ramv` 代表 `VMA` (Virtual Memory Address) 即虚拟地址，`ram` 则代表 `LMA` (Load Memory Address)，即我们 OS image 被 load 的地址，可以理解为物理地址
     - 使用以上的 vmlinux.lds 进行编译之后，得到的 `System.map` 以及 `vmlinux` 中的符号采用的都是虚拟地址，方便之后 debug
-* 从本实验开始我们需要使用刷新缓存的指令扩展，并自动在编译项目前执行 `clean` 任务来防止对头文件的修改无法触发编译任务，在项目顶层目录的 `Makefile` 中需要做如下更改：
-    ```Makefile
-    ...
-    ISA		:=	rv64imafd_zifencei
-    ...
-    ```
 
 ### 关于 PIE
 
@@ -298,17 +292,14 @@ relocate:
     #   YOUR CODE HERE   #
     ######################
 
+    # need a fence to ensure the new translations are in use
+    sfence.vma zero, zero
+
     # set satp with early_pgtbl
     
     ###################### 
     #   YOUR CODE HERE   #
     ######################
-    
-    # flush tlb
-    sfence.vma zero, zero
-		
-    # flush icache
-    fence.i
 		
     ret
 
@@ -320,16 +311,86 @@ boot_stack:
 
 经过 `setup_vm` 设置了一级页表之后，整个 kernel 启动后应该可以直接运行在虚拟地址上了，不过在 `task_init` 中 `kalloc` 的时候可能会出现错误，因为 `mm_init` 中我们释放的内存是 `_ekernel ~ PHY_END`，在进入虚拟地址后 `PHY_END` 还是物理地址，会导致实际上没有内存被释放，`kalloc` 没有可用的空间。因此需要修改 `arch/riscv/kernel/mm.c` 的 `mm_init` 函数，将结束地址调整为虚拟地址，才能正常运行。
 
+??? note "对 `sfence.vma` 和 `fence.i` 语义的详细说明"
+
+    在 10 月 30 日的 commit 中，去除了 `fence.i`，并调整了 `sfence.vma` 的顺序，与 Linux 内核源码保持一致，以避免同学们阅读内核源码时产生困惑。同学们可能会好奇其中的具体原理，这里简单说明一下。
+
+    首先看 RISC-V Privileged Spec 中对 `sfence.vma` 的描述：
+
+    > It is specified as **a fence rather than a TLB flush** to provide cleaner semantics with respect to which instructions are affected by the flush operation and to support a wider variety of dynamic caching structures and memory-management schemes.
+
+    接下来看 [Linux 内核源码（v5.2.21）](https://elixir.bootlin.com/linux/v5.2.21/source/arch/riscv/kernel/head.S#L89)：
+
+    ```asm
+    /*
+	 * Load trampoline page directory, which will cause us to trap to
+	 * stvec if VA != PA, or simply fall through if VA == PA.  We need a
+	 * full fence here because setup_vm() just wrote these PTEs and we need
+	 * to ensure the new translations are in use.
+	 */
+    sfence.vma
+	csrw CSR_SATP, a0
+    ```
+
+    与实验指导的初版代码相比，这里有三个问题：为什么要在 `csrw satp` 之前加一个 `sfence.vma`？为什么后面不需要加 `sfence.vma`？为什么不需要 `fence.i`？
+
+    1. 第一个问题由上面代码段的注释解答：`csrw satp` **前**的 `sfence.vma` 主要是**为了保证新的页表项生效**而设置的一个 fence，而没有用到其刷新 TLB 的功能，毕竟这里才刚刚启用 MMU。那么为什么要保证页表项生效呢？这涉及思考题 2 的答案，在此按下不表。
+    2. 第二个问题由 RISC-V Privileged Spec 10.3 节中的一段话解答：
+    
+        > Changing `satp.MODE` **from `Bare` to other modes and vice versa also takes effect immediately**, without the need to execute an `sfence.vma` instruction.
+
+        也就是说，启用或关闭分页模式时的操作立即生效，不需要额外的 `sfence.vma`。
+
+    3. 第三个问题由 [Linux 内核源码 `local_flush_tlb_all`](https://elixir.bootlin.com/linux/v5.2.21/source/arch/riscv/include/asm/tlbflush.h#L14) 中的注释解答：
+
+        ```c
+        /*
+        * Flush entire local TLB.  'sfence.vma' implicitly fences with the instruction
+        * cache as well, so a 'fence.i' is not necessary.
+        */
+        static inline void local_flush_tlb_all(void)
+        {
+            __asm__ __volatile__ ("sfence.vma" : : : "memory");
+        }
+        ```
+
+        也就是说，`sfence.vma` 会**隐式地刷新指令缓存**，因此不需要额外的 `fence.i`。
+
+        你可能会好奇什么时候才会使用 `fence.i`。在 Linux 源码中搜索，可以发现主要用在进程调度。因为需要让新进程的指令替换掉旧进程的缓存，此时会显式使用 `fence.i`。
+
+    [SFENCE.VMA Before or After SATP Write · Issue #226 · riscv/riscv-isa-manual](https://github.com/riscv/riscv-isa-manual/issues/226) 中 RISC-V 开发者对 `sfence.vma` 和 `csrw satp` 顺序做了一些讨论：
+
+    > - **`sfence.vma` before `csrw satp` may be necessary**: The concern is, what if the mapping for the instruction immediately after SFENCE.VMA has been modified? In the Linux kernel, this mapping is fixed (regardless of address space) so the concern does not apply.
+    > - **`sfence.vma` after `csrw satp` is definitely necessary**: In general, you need to SFENCE after you've recycled an ASID. Since we don't use ASIDs in the Linux kernel yet, every context switch is effectively an ASID reuse, **hence the full TLB flush**.
+
+    根据上述解释，在 `setup_vm_final` 中第二次切换 satp 时，其后必须要设置 `sfence.vma`，否则可能命中旧页表。但是你会发现，即使去掉 `sfence.vma`，实验依然可以正常运行。更进一步地，我们可以设计下面的代码：
+
+    ```c
+    void setup_vm_final() {
+        ...
+        // create old TLB entry
+        asm volatile("li t0, 0x80200000");
+        asm volatile("ld t1, 0(t0)");
+        // set satp with swapper_pg_dir
+        csr_write(satp, ...); // your code
+        // try to hit old TLB entry
+        asm volatile("li t0, 0x80200000");
+        asm volatile("ld t1, 0(t0)");
+        ...
+    }
+    ```
+
+    第二个 `ld` 将失败，说明 TLB 已经被刷新了，并不符合预期。原因是 QEMU、spike 这类模拟器会在写 SATP 时立即刷新 TLB 来避免泄漏无效的缓存映射。不过 RISC-V 的标准中并未强制规定这一点，所以为了兼容性考虑，我们还是需要在写 `satp` 后使用 `sfence.vma` 来保证在任何平台上都可以正确运行。
+
 !!! tip "调试小寄巧"
-    - `sfence.vma` 指令用于刷新 TLB
-    - `fence.i` 指令用于刷新 icache
+
     - 在设置好 `satp` 寄存器之前，我们只可以使用**物理地址**来打断点
         - 因为符号表、`vmlinux.lds` 里面记录的函数名的地址都是虚拟地址
         - 在设置好 `satp` 之前，这样子打断点，会与真实的地址相差一个 `PA2VA_OFFSET`
+        - 你可以在目录下编译生成的 `vmlinux.asm` 中找到所有代码的虚拟地址，然后将其转换成物理地址，再使用 `b *<addr>` 命令设置断点
     - 设置 satp 之后，才可以使用虚拟地址打断点，同时之前设置的物理地址断点也会失效，需要删除
 
 !!! warning "旧版本 QEMU（7.0 以前）对于指令缓存等处理有 bug，会导致刷新了缓存但实际上并没有作用，可能会导致调试过程中出现困惑，或者使得代码以灵车的方式跑了起来，因此请同学们务必保证自己使用的 QEMU 足够新（8.2.2 及以上），否则请参考 lab0/lab1 文档进行更新"
-
 
 #### `setup_vm_final` 的实现
 
