@@ -203,18 +203,12 @@ satp（Supervisor Address Translation and Protection Register）是 RISC-V 中�
     ```
     .
     └── arch
-        └── riscv
-            └── kernel
-                └── vmlinux.lds
+        └── riscv
+            └── kernel
+                └── vmlinux.lds
     ```
     - 新的链接脚本中的 `ramv` 代表 `VMA` (Virtual Memory Address) 即虚拟地址，`ram` 则代表 `LMA` (Load Memory Address)，即我们 OS image 被 load 的地址，可以理解为物理地址
     - 使用以上的 vmlinux.lds 进行编译之后，得到的 `System.map` 以及 `vmlinux` 中的符号采用的都是虚拟地址，方便之后 debug
-* 从本实验开始我们需要使用刷新缓存的指令扩展，并自动在编译项目前执行 `clean` 任务来防止对头文件的修改无法触发编译任务，在项目顶层目录的 `Makefile` 中需要做如下更改：
-    ```Makefile
-    ...
-    ISA		:=	rv64imafd_zifencei
-    ...
-    ```
 
 ### 关于 PIE
 
@@ -298,7 +292,7 @@ relocate:
     #   YOUR CODE HERE   #
     ######################
 
-    # flush tlb
+    # need a fence to ensure the new translations are in use
     sfence.vma zero, zero
 
     # set satp with early_pgtbl
@@ -319,13 +313,13 @@ boot_stack:
 
 ??? note "对 `sfence.vma` 和 `fence.i` 语义的详细说明"
 
-    在 10 月 28 日的 commit 中，去除了 `fence.i`，并调整了 `sfence.vma` 的顺序，与 Linux 内核源码保持一致，以避免同学们阅读内核源码时产生困惑。同学们可能会好奇其中的具体原理，这里简单说明一下。
+    在 10 月 30 日的 commit 中，去除了 `fence.i`，并调整了 `sfence.vma` 的顺序，与 Linux 内核源码保持一致，以避免同学们阅读内核源码时产生困惑。同学们可能会好奇其中的具体原理，这里简单说明一下。
 
     首先看 RISC-V Privileged Spec 中对 `sfence.vma` 的描述：
 
     > It is specified as **a fence rather than a TLB flush** to provide cleaner semantics with respect to which instructions are affected by the flush operation and to support a wider variety of dynamic caching structures and memory-management schemes.
 
-    接下来看 [内核源码（v5.2.21）](https://elixir.bootlin.com/linux/v5.2.21/source/arch/riscv/kernel/head.S#L89)：
+    接下来看 [Linux 内核源码（v5.2.21）](https://elixir.bootlin.com/linux/v5.2.21/source/arch/riscv/kernel/head.S#L89)：
 
     ```asm
     /*
@@ -386,44 +380,7 @@ boot_stack:
     }
     ```
 
-    第二个 `ld` 将失败，说明 TLB 已经被刷新了。这不符合我们的预期。
-
-    最后，[QEMU 源码](https://github.com/qemu/qemu/blob/cea8ac78545a83e1f01c94d89d6f5a3f6b5c05d2/target/riscv/csr.c#L1511) 给出一切的答案：
-
-    ```c title="target/riscv/csr.c"
-    static target_ulong legalize_xatp(CPURISCVState *env, target_ulong old_xatp,
-                                  target_ulong val)
-    {
-        target_ulong mask;
-        bool vm;
-        if (riscv_cpu_mxl(env) == MXL_RV32) {
-            vm = validate_vm(env, get_field(val, SATP32_MODE));
-            mask = (val ^ old_xatp) & (SATP32_MODE | SATP32_ASID | SATP32_PPN);
-        } else {
-            vm = validate_vm(env, get_field(val, SATP64_MODE));
-            mask = (val ^ old_xatp) & (SATP64_MODE | SATP64_ASID | SATP64_PPN);
-        }
-
-        if (vm && mask) {
-            /*
-            * The ISA defines SATP.MODE=Bare as "no translation", but we still
-            * pass these through QEMU's TLB emulation as it improves
-            * performance.  Flushing the TLB on SATP writes with paging
-            * enabled avoids leaking those invalid cached mappings.
-            */
-            tlb_flush(env_cpu(env));
-            return val;
-        }
-        return old_xatp;
-    }
-    ```
-
-    源码告诉我们 QEMU 模拟 TLB 的两个重要信息：
-
-    - 即使不启用分页（Bare 模式），**也会使用 TLB**；
-    - 先验证写入 xatp 值的合法性，如果合法，**执行TLB 刷新**。注释说明了写 SATP 时刷 TLB 是为了避免泄漏无效的缓存映射。
-
-    这是QEMU 的具体实现，无法推广到所有情况。因此需要在写 `satp` 后使用 `sfence.vma`，保证在所有实现上都能正确运行。
+    第二个 `ld` 将失败，说明 TLB 已经被刷新了，并不符合预期。原因是 QEMU、spike 这类模拟器会在写 SATP 时立即刷新 TLB 来避免泄漏无效的缓存映射。不过 RISC-V 的标准中并未强制规定这一点，所以为了兼容性考虑，我们还是需要在写 `satp` 后使用 `sfence.vma` 来保证在任何平台上都可以正确运行。
 
 !!! tip "调试小寄巧"
 
