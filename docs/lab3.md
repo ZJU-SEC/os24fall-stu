@@ -448,9 +448,6 @@ void setup_vm_final() {
 
     // flush TLB
     asm volatile("sfence.vma zero, zero");
-  
-    // flush icache
-    asm volatile("fence.i");
     return;
 }
 
