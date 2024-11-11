@@ -33,9 +33,9 @@
 ### 系统调用约定
 **系统调用**是用户态应用程序请求内核服务的一种方式。在 RISC-V 中，我们使用 `ecall` 指令进行系统调用。当执行这条指令时，处理器会提升特权模式，跳转到异常处理函数，处理这条系统调用。
 
-Linux 中 RISC-V 相关的系统调用可以在 `include/uapi/asm-generic/unistd.h` 中找到，[ syscall(2) ](https://man7.org/linux/man-pages/man2/syscall.2.html)手册页上对RISC-V架构上的调用说明进行了总结，系统调用参数使用 a0 - a5 ，系统调用号使用 a7 ， 系统调用的返回值会被保存到 a0, a1 中。
+Linux 中 RISC-V 相关的系统调用可以在 `include/uapi/asm-generic/unistd.h` 中找到，[syscall(2)](https://man7.org/linux/man-pages/man2/syscall.2.html)手册页上对RISC-V架构上的调用说明进行了总结，系统调用参数使用 a0 - a5 ，系统调用号使用 a7 ， 系统调用的返回值会被保存到 a0, a1 中。
 
-### sstatus[SUM] PTE[U]
+### sstatus[SUM] 与 PTE[U]
 当页表项 PTE[U] 置 0 时，该页表项对应的内存页为内核页，运行在 U-Mode 下的代码*无法*访问。当页表项 PTE[U] 置 1 时，该页表项对应的内存页为用户页，运行在 S-Mode 下的代码*无法*访问。如果想让 S 特权级下的程序能够访问用户页，需要对 sstatus[SUM] 位置 1 。但是无论什么样的情况下，用户页中的指令对于 S-Mode 而言都是**无法执行**的。 
 
 ### 用户态栈与内核态栈
@@ -102,7 +102,7 @@ for GNU/Linux 3.2.0, not stripped
 #define USER_END   (0x0000004000000000) // user space end virtual address
 ```
 
-* 从 `repo` 同步以下文件和文件夹。并按照下面的位置来放置这些新文件。值得注意的是，我们在 `mm` 中添加了 `buddy system`，但是也保证了原来调用的 `kalloc` 和 `kfree` 的兼容。你应该无需修改原先使用了 `kalloc` 的相关代码，如果出现兼容性问题可以联系助教。为了减小大家的工作量，我们替大家实现了 Buddy System，大家可以直接使用这些函数来管理内存：
+* 从 repo 同步以下文件和文件夹。并按照下面的位置来放置这些新文件。值得注意的是，我们在 `mm` 中添加了 `buddy system`，但是也保证了原来调用的 `kalloc` 和 `kfree` 的兼容。你应该无需修改原先使用了 `kalloc` 的相关代码，如果出现兼容性问题可以联系助教。为了减小大家的工作量，我们替大家实现了 Buddy System，大家可以直接使用这些函数来管理内存：
 ```c
 // 分配 page_cnt 个页的地址空间，返回分配内存的地址。保证分配的内存在虚拟地址和物理地址上都是连续的
 uint64_t alloc_pages(uint64_t page_cnt);
@@ -134,7 +134,7 @@ void free_pages(uint64_t addr);
     └── uapp.S
 ```
 * 修改**根目录**下的 Makefile, 将 `user` 纳入工程管理。
-* 在根目录下 `make` 会生成 `user/uapp.o` `user/uapp.elf` `user/uapp.bin`，以及我们最终测试使用的 ELF 可执行文件 `user/uapp` 。 通过 `objdump` 我们可以看到 uapp 使用 ecall 来调用 SYSCALL (在 U-Mode 下使用 ecall 会触发environment-call-from-U-mode异常)。从而将控制权交给处在 S-Mode 的 OS， 由内核来处理相关异常。
+* 在根目录下 `make` 会生成 `user/uapp.o` `user/uapp.elf` `user/uapp.bin`，以及我们最终测试使用的 ELF 可执行文件 `user/uapp` 。 通过 `objdump` 我们可以看到 uapp 使用 ecall 来调用 SYSCALL (在 U-Mode 下使用 ecall 会触发 `environment-call-from-U-mode` 异常)。从而将控制权交给处在 S-Mode 的 OS， 由内核来处理相关异常。
 * 在本次实验中，我们首先会将用户态程序 strip 成纯二进制文件来运行。这种情况下，用户程序运行的第一条指令位于二进制文件的开始位置, 也就是说 `_sramdisk` 处的指令就是我们要执行的第一条指令。我们将运行纯二进制文件作为第一步，在确认用户态的纯二进制文件能够运行后，我们再将存储到内存中的用户程序文件换为 ELF 来进行执行。
 ```
 0000000000000004 <getpid>:                                                                       
@@ -158,7 +158,7 @@ void free_pages(uint64_t addr);
 
 ### 创建用户态进程
 * 本次实验只需要创建 4 个用户态进程，修改 `proc.h` 中的 `NR_TASKS` 即可。
-* 由于创建用户态进程要对 `sepc` `sstatus` `sscratch` 做设置，我们将其加入 `thread_struct` 中。
+* 由于创建用户态进程要对 `sepc`, `sstatus`, `sscratch` 做设置，我们将其加入 `thread_struct` 中。
 * 由于多个用户态进程需要保证相对隔离，因此不可以共用页表。我们为每个用户态进程都创建一个页表。修改 `task_struct` 如下。
 ```c
 // proc.h 
@@ -184,17 +184,17 @@ struct task_struct {
     pagetable_t pgd;
 };
 ```
-* 修改 task_init
+* 修改 `task_init()` 函数：
     * 对于每个进程，初始化我们刚刚在 `thread_struct` 中添加的三个变量。具体而言：
         * 将 `sepc` 设置为 `USER_START`。
         * 配置 `sstatus` 中的 `SPP`（使得 sret 返回至 U-Mode）， `SPIE` （sret 之后开启中断）， `SUM`（S-Mode 可以访问 User 页面）。
-        * 将 `sscratch` 设置为 `U-Mode` 的 sp，其值为 `USER_END` （即，用户态栈被放置在 `user space` 的最后一个页面）。
+        * 将 `sscratch` 设置为 `U-Mode` 的 sp，其值为 `USER_END` （将用户态栈放置在 `user space` 的最后一个页面）。
     * 对于每个进程，创建属于它自己的页表。
-    * 为了避免 `U-Mode` 和 `S-Mode` 切换的时候切换页表，我们将内核页表 （ `swapper_pg_dir` ） 复制到每个进程的页表中。
+    * 为了避免 `U-Mode` 和 `S-Mode` 切换的时候切换页表，我们将内核页表 `swapper_pg_dir` 复制到每个进程的页表中。
     * 将 `uapp` 所在的页面映射到每个进行的页表中。注意，在程序运行过程中，有部分数据不在栈上，而在初始化的过程中就已经被分配了空间（比如我们的 `uapp` 中的 `counter` 变量）。所以，二进制文件需要先被 **拷贝** 到一块某个进程专用的内存之后再进行映射，防止所有的进程共享数据，造成预期外的进程间相互影响。
-    * 设置用户态栈。对每个用户态进程，其拥有两个栈： 用户态栈和内核态栈；其中，内核态栈在 `lab3` 中我们已经设置好了。我们可以通过 `alloc_page` 接口申请一个空的页面来作为用户态栈，并映射到进程的页表中。
+    * 设置用户态栈。对每个用户态进程，其拥有两个栈： 用户态栈和内核态栈；其中，内核态栈在 `lab3` 中我们已经设置好了。我们可以通过 `alloc_page()` 函数申请一个空的页面来作为用户态栈，并映射到进程的页表中。
 
-* 修改 __switch_to， 需要加入 保存/恢复 `sepc` `sstatus` `sscratch` 以及 切换页表的逻辑。
+* 修改 `__switch_to`：需要加入保存/恢复 `sepc`, `sstatus`, `sscratch` 以及切换页表的逻辑。
 * 在切换了页表之后，需要通过 `sfence.vma` 来刷新 TLB 和 ICache。
 
 ```
@@ -221,18 +221,18 @@ struct task_struct {
 
 ```
 
-### 修改中断入口/返回逻辑 ( _trap ) 以及中断处理函数 （ trap_handler ）
-* 与 ARM 架构不同的是，RISC-V 中只有一个栈指针寄存器( sp )，因此需要我们来完成用户栈与内核栈的切换。
-* 由于我们的用户态进程运行在 `U-Mode` 下， 使用的运行栈也是 `U-Mode Stack`， 因此当触发异常时， 我们首先要对栈进行切换 （ `U-Mode Stack` -> `S-Mode Stack` ）。同理 让我们完成了异常处理， 从 `S-Mode` 返回至 `U-Mode`， 也需要进行栈切换 （ `S-Mode Stack` -> `U-Mode Stack` ）。
-* 修改 `__dummy`。在 **4.2** 中 我们初始化时， `thread_struct.sp` 保存了 `S-Mode sp`， `thread_struct.sscratch` 保存了 `U-Mode sp`， 因此在 `S-Mode -> U-Mode` 的时候，我们只需要交换对应的寄存器的值即可。
-* 修改 `_trap` 。同理 在 `_trap` 的首尾我们都需要做类似的操作。**注意如果是 内核线程( 没有 U-Mode Stack ) 触发了异常，则不需要进行切换。（内核线程的 sp 永远指向的 S-Mode Stack， sscratch 为 0）**
-* `uapp` 使用 `ecall` 会产生 `ECALL_FROM_U_MODE` **exception**。因此我们需要在 `trap_handler` 里面进行捕获。修改 `trap_handler` 如下：
+### 修改中断入口/返回逻辑 `_trap` 以及中断处理函数 `trap_handler()`
+* 与 ARM 架构不同的是，RISC-V 中只有一个栈指针寄存器 `sp` ，因此需要我们来完成用户栈与内核栈的切换。
+* 由于我们的用户态进程运行在 `U-Mode` 下，使用的运行栈也是 `U-Mode Stack`，因此当触发异常时，我们首先要对栈进行切换（ `U-Mode Stack` -> `S-Mode Stack` ）。同理，当我们完成了异常处理，从 `S-Mode` 返回至 `U-Mode`，也需要进行栈切换（ `S-Mode Stack` -> `U-Mode Stack` ）。
+* 修改 `__dummy`：在 **4.2** 中我们初始化时，`thread_struct.sp` 保存了 `S-Mode sp`，`thread_struct.sscratch` 保存了 `U-Mode sp`，因此在 `S-Mode -> U-Mode` 的时候，我们只需要交换对应的寄存器的值即可。
+* 修改 `_trap` ：同理 在 `_trap` 的首尾我们都需要做类似的操作。**注意如果是内核线程（没有 U-Mode Stack）触发了异常，则不需要进行切换。（内核线程的 `sp` 永远指向的 S-Mode Stack， `sscratch` 为 0）**
+* `uapp` 使用 `ecall` 会产生 `ECALL_FROM_U_MODE` **exception**。因此我们需要在 `trap_handler()` 里面进行捕获。修改 `trap_handler()` 如下：
     ```c
     void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
         ...
     }
     ```
-    这里需要解释新增加的第三个参数 `regs`， 在 _trap 中我们将寄存器的内容**连续**的保存在 S-Mode Stack上， 因此我们可以将这一段看做一个叫做 `pt_regs`的结构体。我们可以从这个结构体中取到相应的寄存器的值（ 比如 syscall 中我们需要从 a0 ~ a7 寄存器中取到参数 ）。这个结构体中的值也可以按需添加，同时需要在 `_trap` 中存入对应的寄存器值以供使用， 示例如下图：
+    这里需要解释新增加的第三个参数 `regs`，在 _trap 中我们将寄存器的内容**连续**的保存在 S-Mode Stack上，因此我们可以将这一段看做一个叫做 `pt_regs`的结构体。我们可以从这个结构体中取到相应的寄存器的值（比如 `syscall` 中我们需要从 `a0` ~ `a7` 寄存器中取到参数 ）。这个结构体中的值也可以按需添加，同时需要在 `_trap` 中存入对应的寄存器值以供使用， 示例如下图：
     ```
         High Addr ───►  ┌─────────────┐
                         │   sstatus   │
@@ -261,23 +261,23 @@ struct task_struct {
         Low  Addr ───►  └─────────────┘
     
     ```
-    请同学自己补充 `struct pt_regs`的定义， 以及在 `trap_handler` 中补充处理 SYSCALL 的逻辑。
+    请同学自己补充 `struct pt_regs`的定义，以及在 `trap_handler` 中补充处理 SYSCALL 的逻辑。
 ### 添加系统调用
 * 本次实验要求的系统调用函数原型以及具体功能如下：
-    * 64 号系统调用 `sys_write(unsigned int fd, const char* buf, size_t count)` 该调用将用户态传递的字符串打印到屏幕上，此处fd为标准输出（1），buf为用户需要打印的起始地址，count为字符串长度，返回打印的字符数。( 具体见 user/printf.c )
-    * 172 号系统调用 `sys_getpid()` 该调用从current中获取当前的pid放入a0中返回，无参数。（ 具体见 user/getpid.c ）
-* 增加 `syscall.c` `syscall.h` 文件， 并在其中实现 `getpid` 以及 `write` 逻辑。
-* 系统调用的返回参数放置在 `a0` 中 (不可以直接修改寄存器， 应该修改 regs 中保存的内容)。
-* 针对系统调用这一类异常， 我们需要手动完成 `sepc + 4` （ `sepc` 记录的是触发异常的指令地址， 由于系统调用这类异常处理完成之后， 我们应该继续执行后续的指令，因此需要我们手动修改 `sepc` 的地址，使得 `sret` 之后 程序继续执行）。
+    * 64 号系统调用 `sys_write(unsigned int fd, const char* buf, size_t count)` 该调用将用户态传递的字符串打印到屏幕上，此处fd为标准输出（1），buf为用户需要打印的起始地址，count为字符串长度，返回打印的字符数。详见 `user/printf.c`。
+    * 172 号系统调用 `sys_getpid()` 该调用从current中获取当前的pid放入a0中返回，无参数。详见 `user/getpid.c`。
+* 增加 `syscall.c`, `syscall.h` 文件，并在其中实现 `getpid()` 以及 `write()` 逻辑。
+* 系统调用的返回参数放置在 `a0` 中（不可以直接修改寄存器， 应该修改 regs 中保存的内容）。
+* 针对系统调用这一类异常， 我们需要手动完成 `sepc + 4`（ `sepc` 记录的是触发异常的指令地址，由于系统调用这类异常处理完成之后，我们应该继续执行后续的指令，因此需要我们手动修改 `sepc` 的地址，使得 `sret` 之后程序继续执行）。
 
 ### 修改 head.S 以及 start_kernel
-* 在之前的 lab 中， 在 OS boot 之后，我们需要等待一个时间片，才会进行调度。我们现在更改为 OS boot 完成之后立即调度 uapp 运行。
-* 在 start_kernel 中调用 schedule() 注意放置在 test() 之前。
-* 将 head.S 中 enable interrupt sstatus.SIE 逻辑注释，确保 schedule 过程不受中断影响。
+* 在之前的 lab 中，在 OS boot 之后，我们需要等待一个时间片，才会进行调度。我们现在更改为 OS boot 完成之后立即调度 uapp 运行。
+* 在 `start_kernel()` 中调用 `schedule()` 注意放置在 `test()` 之前。
+* 将 `head.S` 中 enable interrupt sstatus.SIE 逻辑注释，确保 schedule 过程不受中断影响。
 
 ### 测试纯二进制文件
 
-由于加入了一些新的 .c 文件，可能需要修改一些Makefile文件，请同学自己尝试修改，使项目可以编译并运行。
+由于加入了一些新的 .c 文件，可能需要修改一些 Makefile 文件，请同学自己尝试修改，使项目可以编译并运行。
 
 ??? success "输出示例"
     ```
