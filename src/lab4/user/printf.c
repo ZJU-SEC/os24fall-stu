@@ -1,111 +1,294 @@
+// credit: 45gfg9 <45gfg9@45gfg9.net>
 #include "stdio.h"
 #include "syscall.h"
 
 int tail = 0;
 char buffer[1000] = {[0 ... 999] = 0};
 
-void putc(char c) {
+int putc(int c) {
     buffer[tail++] = (char)c;
+    return (char)c;
 }
 
-static int vprintfmt(void(*putch)(char), const char *fmt, va_list vl) {
-    int in_format = 0, longarg = 0;
-    size_t pos = 0;
-    for( ; *fmt; fmt++) {
-        if (in_format) {
-            switch(*fmt) {
-                case 'l': { 
-                    longarg = 1; 
-                    break; 
-                }
-                
-                case 'x': {
-                    long num = longarg ? va_arg(vl, long) : va_arg(vl, int);
+#ifndef __MAX
+#define __MAX(a, b)         \
+    ({                        \
+        __typeof__(a) _a = (a); \
+        __typeof__(b) _b = (b); \
+        _a > _b ? _a : _b;      \
+    })
+#endif
 
-                    int hexdigits = 2 * (longarg ? sizeof(long) : sizeof(int)) - 1;
-                    for(int halfbyte = hexdigits; halfbyte >= 0; halfbyte--) {
-                        int hex = (num >> (4*halfbyte)) & 0xF;
-                        char hexchar = (hex < 10 ? '0' + hex : 'a' + hex - 10);
-                        putch(hexchar);
-                        pos++;
-                    }
-                    longarg = 0; in_format = 0; 
-                    break;
-                }
-            
-                case 'd': {
-                    long num = longarg ? va_arg(vl, long) : va_arg(vl, int);
-                    if (num < 0) {
-                        num = -num; putch('-');
-                        pos++;
-                    }
-                    int bits = 0;
-                    char decchar[25] = {'0', 0};
-                    for (long tmp = num; tmp; bits++) {
-                        decchar[bits] = (tmp % 10) + '0';
-                        tmp /= 10;
-                    }
+struct fmt_flags {
+    bool in_format;
+    bool longflag;
+    bool sharpflag;
+    bool zeroflag;
+    bool spaceflag;
+    bool sign;
+    int width;
+    int prec;
+};
 
-                    if (bits == 0) bits ++;
+int isspace(int c) {
+    return c == ' ' || (c >= '\t' && c <= '\r');
+}
 
-                    for (int i = bits - 1; i >= 0; i--) {
-                        putch(decchar[i]);
-                    }
-                    pos += bits + 1;
-                    longarg = 0; in_format = 0; 
-                    break;
-                }
+long strtol(const char *restrict nptr, char **restrict endptr, int base) {
+    long ret = 0;
+    bool neg = false;
+    const char *p = nptr;
 
-                case 'u': {
-                    unsigned long num = longarg ? va_arg(vl, long) : va_arg(vl, int);
-                    int bits = 0;
-                    char decchar[25] = {'0', 0};
-                    for (long tmp = num; tmp; bits++) {
-                        decchar[bits] = (tmp % 10) + '0';
-                        tmp /= 10;
-                    }
+    while (isspace(*p)) {
+        p++;
+    }
 
-                    if (bits == 0) bits ++;
+    if (*p == '-') {
+        neg = true;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
 
-                    for (int i = bits - 1; i >= 0; i--) {
-                        putch(decchar[i]);
-                    }
-                    pos += bits - 1;
-                    longarg = 0; in_format = 0; 
-                    break;
-                }
-
-                case 's': {
-                    const char* str = va_arg(vl, const char*);
-                    while (*str) {
-                        putch(*str);
-                        pos++; 
-                        str++;
-                    }
-                    longarg = 0; in_format = 0; 
-                    break;
-                }
-
-                case 'c': {
-                    char ch = (char)va_arg(vl,int);
-                    putch(ch);
-                    pos++;
-                    longarg = 0; in_format = 0; 
-                    break;
-                }
-                default:
-                    break;
+    if (base == 0) {
+        if (*p == '0') {
+            p++;
+            if (*p == 'x' || *p == 'X') {
+                base = 16;
+                p++;
+            } else {
+                base = 8;
             }
-        }
-        else if(*fmt == '%') {
-          in_format = 1;
-        }
-        else {
-            putch(*fmt);
-            pos++;
+        } else {
+            base = 10;
         }
     }
 
+    while (1) {
+        int digit;
+        if (*p >= '0' && *p <= '9') {
+            digit = *p - '0';
+        } else if (*p >= 'a' && *p <= 'z') {
+            digit = *p - ('a' - 10);
+        } else if (*p >= 'A' && *p <= 'Z') {
+            digit = *p - ('A' - 10);
+        } else {
+            break;
+        }
+
+        if (digit >= base) {
+            break;
+        }
+
+        ret = ret * base + digit;
+        p++;
+    }
+
+    if (endptr) {
+        *endptr = (char *)p;
+    }
+
+    return neg ? -ret : ret;
+}
+
+// puts without newline
+static int puts_wo_nl(int (*putch)(int), const char *s) {
+    if (!s) {
+        s = "(null)";
+    }
+    const char *p = s;
+    while (*p) {
+        putch(*p++);
+    }
+    return p - s;
+}
+
+static int print_dec_int(int (*putch)(int), unsigned long num, bool is_signed, struct fmt_flags *flags) {
+    if (is_signed && num == 0x8000000000000000UL) {
+        // special case for 0x8000000000000000
+        return puts_wo_nl(putch, "-9223372036854775808");
+    }
+
+    if (flags->prec == 0 && num == 0) {
+        return 0;
+    }
+
+    bool neg = false;
+
+    if (is_signed && (long)num < 0) {
+        neg = true;
+        num = -num;
+    }
+
+    char buf[20];
+    int decdigits = 0;
+
+    bool has_sign_char = is_signed && (neg || flags->sign || flags->spaceflag);
+
+    do {
+        buf[decdigits++] = num % 10 + '0';
+        num /= 10;
+    } while (num);
+
+    if (flags->prec == -1 && flags->zeroflag) {
+        flags->prec = flags->width;
+    }
+
+    int written = 0;
+
+    for (int i = flags->width - __MAX(decdigits, flags->prec) - has_sign_char; i > 0; i--) {
+        putch(' ');
+        ++written;
+    }
+
+    if (has_sign_char) {
+        putch(neg ? '-' : flags->sign ? '+' : ' ');
+        ++written;
+    }
+
+    for (int i = decdigits; i < flags->prec - has_sign_char; i++) {
+        putch('0');
+        ++written;
+    }
+
+    for (int i = decdigits - 1; i >= 0; i--) {
+        putch(buf[i]);
+        ++written;
+    }
+
+    return written;
+}
+
+int vprintfmt(int (*putch)(int), const char *fmt, va_list vl) {
+    static const char lowerxdigits[] = "0123456789abcdef";
+    static const char upperxdigits[] = "0123456789ABCDEF";
+
+    struct fmt_flags flags = {};
+
+    int written = 0;
+
+    for (; *fmt; fmt++) {
+        if (flags.in_format) {
+            if (*fmt == '#') {
+                flags.sharpflag = true;
+            } else if (*fmt == '0') {
+                flags.zeroflag = true;
+            } else if (*fmt == 'l' || *fmt == 'z' || *fmt == 't' || *fmt == 'j') {
+                // l: long, z: size_t, t: ptrdiff_t, j: intmax_t
+                flags.longflag = true;
+            } else if (*fmt == '+') {
+                flags.sign = true;
+            } else if (*fmt == ' ') {
+                flags.spaceflag = true;
+            } else if (*fmt == '*') {
+                flags.width = va_arg(vl, int);
+            } else if (*fmt >= '1' && *fmt <= '9') {
+                flags.width = strtol(fmt, (char **)&fmt, 10);
+                fmt--;
+            } else if (*fmt == '.') {
+                fmt++;
+                if (*fmt == '*') {
+                    flags.prec = va_arg(vl, int);
+                } else {
+                    flags.prec = strtol(fmt, (char **)&fmt, 10);
+                    fmt--;
+                }
+            } else if (*fmt == 'x' || *fmt == 'X' || *fmt == 'p') {
+                bool is_long = *fmt == 'p' || flags.longflag;
+
+                unsigned long num = is_long ? va_arg(vl, unsigned long) : va_arg(vl, unsigned int);
+
+                if (flags.prec == 0 && num == 0 && *fmt != 'p') {
+                    flags.in_format = false;
+                    continue;
+                }
+
+                // 0x prefix for pointers, or, if # flag is set and non-zero
+                bool prefix = *fmt == 'p' || (flags.sharpflag && num != 0);
+
+                int hexdigits = 0;
+                const char *xdigits = *fmt == 'X' ? upperxdigits : lowerxdigits;
+                char buf[2 * sizeof(unsigned long)];
+
+                do {
+                    buf[hexdigits++] = xdigits[num & 0xf];
+                    num >>= 4;
+                } while (num);
+
+                if (flags.prec == -1 && flags.zeroflag) {
+                    flags.prec = flags.width - 2 * prefix;
+                }
+
+                for (int i = flags.width - 2 * prefix - __MAX(hexdigits, flags.prec); i > 0; i--) {
+                    putch(' ');
+                    ++written;
+                }
+
+                if (prefix) {
+                    putch('0');
+                    putch(*fmt == 'X' ? 'X' : 'x');
+                    written += 2;
+                }
+
+                for (int i = hexdigits; i < flags.prec; i++) {
+                    putch('0');
+                    ++written;
+                }
+
+                for (int i = hexdigits - 1; i >= 0; i--) {
+                    putch(buf[i]);
+                    ++written;
+                }
+
+                flags.in_format = false;
+            } else if (*fmt == 'd' || *fmt == 'i' || *fmt == 'u') {
+                long num = flags.longflag ? va_arg(vl, long) : va_arg(vl, int);
+
+                written += print_dec_int(putch, num, *fmt != 'u', &flags);
+                flags.in_format = false;
+            } else if (*fmt == 'n') {
+                if (flags.longflag) {
+                    long *n = va_arg(vl, long *);
+                    *n = written;
+                } else {
+                    int *n = va_arg(vl, int *);
+                    *n = written;
+                }
+                flags.in_format = false;
+            } else if (*fmt == 's') {
+                const char *s = va_arg(vl, const char *);
+                written += puts_wo_nl(putch, s);
+                flags.in_format = false;
+            } else if (*fmt == 'c') {
+                int ch = va_arg(vl, int);
+                putch(ch);
+                ++written;
+                flags.in_format = false;
+            } else if (*fmt == '%') {
+                putch('%');
+                ++written;
+                flags.in_format = false;
+            } else {
+                putch(*fmt);
+                ++written;
+                flags.in_format = false;
+            }
+        } else if (*fmt == '%') {
+            flags = (struct fmt_flags) {.in_format = true, .prec = -1};
+        } else {
+            putch(*fmt);
+            ++written;
+        }
+    }
+
+    return written;
+}
+
+int printf(const char* s, ...) {
+    int res = 0;
+    va_list vl;
+    va_start(vl, s);
+    res = vprintfmt(putc, s, vl);
     long syscall_ret, fd = 1;
     buffer[tail++] = '\0';
     asm volatile ("li a7, %1\n"
@@ -116,15 +299,7 @@ static int vprintfmt(void(*putch)(char), const char *fmt, va_list vl) {
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
                   : "i" (SYS_WRITE), "r" (fd), "r" (&buffer), "r" (tail));
-    return syscall_ret;
-}
-
-int printf(const char* s, ...) {
-    int res = 0;
-    va_list vl;
-    va_start(vl, s);
     tail = 0;
-    res = vprintfmt(putc, s, vl);
     va_end(vl);
     return res;
 }

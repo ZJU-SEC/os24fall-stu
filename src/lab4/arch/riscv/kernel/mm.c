@@ -1,7 +1,6 @@
+#include "mm.h"
 #include "defs.h"
 #include "string.h"
-#include "mm.h"
-#include "stdint.h"
 #include "printk.h"
 
 extern char _ekernel[];
@@ -15,29 +14,12 @@ struct {
     struct run *freelist;
 } kmem;
 
-
-
-void kfreerange(char *start, char *end) {
-    // char *addr = (char *)PGROUNDUP((uint64_t)start);
-    // for (; (uint64_t)(addr) + PGSIZE <= (uint64_t)end; addr += PGSIZE) {
-    //     kfree((uint64_t)addr);
-    // }
-    return;
-}
-
-
-
-// fine, write buddy system here
-
 #define LEFT_LEAF(index) ((index) * 2 + 1)
 #define RIGHT_LEAF(index) ((index) * 2 + 2)
 #define PARENT(index) ( ((index) + 1) / 2 - 1)
-
 #define IS_POWER_OF_2(x) (!((x)&((x)-1)))
-
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-extern char _ekernel[];
 void *free_page_start = &_ekernel;
 struct buddy buddy;
 
@@ -70,7 +52,7 @@ void buddy_init() {
         buddy.bitmap[i] = node_size;
     }
 
-    for (uint64_t pfn = 0; (uint64_t)PFN2PHYS(pfn) < VA2PA((uint64_t)free_page_start); pfn++) {
+    for (uint64_t pfn = 0; (uint64_t)PFN2PHYS(pfn) < VA2PA((uint64_t)free_page_start); ++pfn) {
         buddy_alloc(1);
     }
 
@@ -78,38 +60,36 @@ void buddy_init() {
     return;
 }
 
-void buddy_free(uint64_t pfn)
-{
+void buddy_free(uint64_t pfn) {
     uint64_t node_size, index = 0;
     uint64_t left_longest, right_longest;
 
     node_size = 1;
     index = pfn + buddy.size - 1;
 
-    for (; buddy.bitmap[index] ; index = PARENT(index)) {
-    node_size *= 2;
-    if (index == 0)
-        break;
+    for (; buddy.bitmap[index]; index = PARENT(index)) {
+        node_size *= 2;
+        if (index == 0)
+            break;
     }
 
     buddy.bitmap[index] = node_size;
 
     while (index) {
-    index = PARENT(index);
-    node_size *= 2;
+        index = PARENT(index);
+        node_size *= 2;
 
-    left_longest = buddy.bitmap[LEFT_LEAF(index)];
-    right_longest = buddy.bitmap[RIGHT_LEAF(index)];
+        left_longest = buddy.bitmap[LEFT_LEAF(index)];
+        right_longest = buddy.bitmap[RIGHT_LEAF(index)];
 
-    if (left_longest + right_longest == node_size) 
-        buddy.bitmap[index] = node_size;
-    else
-        buddy.bitmap[index] = MAX(left_longest, right_longest);
+        if (left_longest + right_longest == node_size) 
+            buddy.bitmap[index] = node_size;
+        else
+            buddy.bitmap[index] = MAX(left_longest, right_longest);
     }
 }
 
 uint64_t buddy_alloc(uint64_t nrpages) {
-
     uint64_t index = 0;
     uint64_t node_size;
     uint64_t pfn = 0;
@@ -123,76 +103,76 @@ uint64_t buddy_alloc(uint64_t nrpages) {
         return 0;
 
     for(node_size = buddy.size; node_size != nrpages; node_size /= 2 ) {
-    if (buddy.bitmap[LEFT_LEAF(index)] >= nrpages)
-        index = LEFT_LEAF(index);
-    else
-        index = RIGHT_LEAF(index);
+        if (buddy.bitmap[LEFT_LEAF(index)] >= nrpages)
+            index = LEFT_LEAF(index);
+        else
+            index = RIGHT_LEAF(index);
     }
 
     buddy.bitmap[index] = 0;
     pfn = (index + 1) * node_size - buddy.size;
 
     while (index) {
-    index = PARENT(index);
-    buddy.bitmap[index] = 
-        MAX(buddy.bitmap[LEFT_LEAF(index)], buddy.bitmap[RIGHT_LEAF(index)]);
+        index = PARENT(index);
+        buddy.bitmap[index] = 
+            MAX(buddy.bitmap[LEFT_LEAF(index)], buddy.bitmap[RIGHT_LEAF(index)]);
     }
-
-    // printk("pfn: %lx\n", pfn);
-    // while(1);
     
     return pfn;
 }
 
 
-uint64_t alloc_pages(uint64_t nrpages){
+void *alloc_pages(uint64_t nrpages) {
     uint64_t pfn = buddy_alloc(nrpages);
     if (pfn == 0)
         return 0;
-    return (PA2VA(PFN2PHYS(pfn)));
+    return (void *)(PA2VA(PFN2PHYS(pfn)));
 }
 
-uint64_t alloc_page(){
-    uint64_t pfn = buddy_alloc(1);
-    if (pfn == 0)
-        return 0;
-    return (PA2VA(PFN2PHYS(pfn)));
+void *alloc_page() {
+    return alloc_pages(1);
 }
 
-void free_pages(uint64_t va){
-    buddy_free(PHYS2PFN(VA2PA(va)));
+void free_pages(void *va) {
+    buddy_free(PHYS2PFN(VA2PA((uint64_t)va)));
 }
 
-void mm_init(void) {
-    // kfreerange(_ekernel, (char *)0xffffffe008000000);
-    // printk("_ekernel: %lx\n", (uint64_t)_ekernel);
-    // printk("...mm_init done!\n");
-    buddy_init();
-}
-
-uint64_t kalloc() {
+void *kalloc() {
     // struct run *r;
+
     // r = kmem.freelist;
-    // // printk("r is %lx\n", (uint64_t)r);
     // kmem.freelist = r->next;
     
     // memset((void *)r, 0x0, PGSIZE);
-    // return (uint64_t) r;
+    // return (void *)r;
     return alloc_page();
 }
 
-void kfree(uint64_t addr) {
+void kfree(void *addr) {
     // struct run *r;
 
     // // PGSIZE align 
-    // addr = addr & ~(PGSIZE - 1);
+    // *(uintptr_t *)&addr = (uintptr_t)addr & ~(PGSIZE - 1);
 
-    // memset((void *)addr, 0x0, (uint64_t)PGSIZE);
+    // memset(addr, 0x0, (uint64_t)PGSIZE);
 
     // r = (struct run *)addr;
     // r->next = kmem.freelist;
     // kmem.freelist = r;
-
-    // return ;
     free_pages(addr);
+
+    return;
+}
+
+void kfreerange(char *start, char *end) {
+    char *addr = (char *)PGROUNDUP((uintptr_t)start);
+    for (; (uintptr_t)(addr) + PGSIZE <= (uintptr_t)end; addr += PGSIZE) {
+        kfree((void *)addr);
+    }
+}
+
+void mm_init(void) {
+    // kfreerange(_ekernel, (char *)PHY_END+PA2VA_OFFSET);
+    buddy_init();
+    printk("...mm_init done!\n");
 }
