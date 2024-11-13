@@ -367,7 +367,9 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
 ### 添加 ELF 解析与加载
 #### ELF 格式
 
-ELF 文件中包含了将程序加载到内存所需的信息，当我们通过 `readelf` 来查看一个 ELF 可执行文件的时候，我们可以读到被包含在 ELF Header 中的信息：
+ELF 文件中包含了将程序加载到内存所需的信息，可以参考[这个链接](https://blog.csdn.net/u014358031/article/details/143691591)
+
+当我们通过 `readelf` 来查看一个 ELF 可执行文件的时候，我们可以读到被包含在 ELF Header 中的信息：
 
 ??? abstract "`readelf -a -W uapp`"
     ```plaintext
@@ -549,7 +551,7 @@ void load_program(struct task_struct *task) {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)_sramdisk;
     Elf64_Phdr *phdrs = (Elf64_Phdr *)(_sramdisk + ehdr->e_phoff);
     for (int i = 0; i < ehdr->e_phnum; ++i) {
-        phdr = phdrs + i;
+        Elf64_Phdr *phdr = phdrs + i;
         if (phdr->p_type == PT_LOAD) {
             // alloc space and copy content
           	// do mapping
