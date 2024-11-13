@@ -86,12 +86,12 @@ for GNU/Linux 3.2.0, not stripped
     ```lds title="arch/riscv/kernel/vmlinux.lds" linenums="45"
         .data : ALIGN(0x1000) {
             _sdata = .;
-
+    
             *(.sdata .sdata*)
             *(.data .data.*)
             
             _edata = .;
-
+    
             . = ALIGN(0x1000);
             _sramdisk = .;
             *(.uapp .uapp*)
@@ -148,7 +148,7 @@ for GNU/Linux 3.2.0, not stripped
         在根目录下 `make` 会生成 `user/uapp.o`（这个会被链接到 vmlinux 中）`user/uapp.elf` `user/uapp.bin`，以及我们最终测试使用的 ELF 可执行文件 `user/uapp`。
         
         通过 `objdump` 我们可以看到 uapp 使用 ecall 来调用 SYSCALL（在 U-Mode 下使用 ecall 会触发 `environment-call-from-U-mode` 异常），从而将控制权交给处在 S-Mode 的 OS，由内核来处理相关异常：
-
+        
         ```
         0000000000000004 <getpid>:
            4:   fe010113            add sp,sp,-32
@@ -158,7 +158,7 @@ for GNU/Linux 3.2.0, not stripped
           14:   0ac00893            li  a7,172
           18:   00000073            ecall               <- SYS_GETPID                        
         ...
-
+        
         0000000000000f70 <printf>:
         ...
         1030:   00070513            mv  a0,a4
@@ -184,13 +184,13 @@ for GNU/Linux 3.2.0, not stripped
         uint64_t s[12];
         uint64_t sepc, sstatus, sscratch; 
     };
-
+    
     struct task_struct {
         uint64_t state;
         uint64_t counter;
         uint64_t priority;
         uint64_t pid;
-
+    
         struct thread_struct thread;
         uint64_t *pgd;  // 用户态页表
     };
@@ -212,10 +212,6 @@ for GNU/Linux 3.2.0, not stripped
 * 设置用户态栈，对每个用户态进程，其拥有两个栈：
     - 用户态栈：我们可以申请一个空的页面来作为用户态栈，并映射到进程的页表中
     - 内核态栈；在 lab3 中已经设置好了，就是 `thread.sp`
-
-### 修改 `__switch_to`
-
-在前面新增了 sepc、sstatus、sscratch 之后，需要将这些变量在切换进程时保存在栈上，因此需要更新 `__switch_to` 中的逻辑，同时需要增加切换页表的逻辑。在切换了页表之后，需要通过 `sfence.vma` 来刷新 TLB 和 ICache。
 
 ```
                 PHY_START                                                                PHY_END
@@ -240,6 +236,10 @@ for GNU/Linux 3.2.0, not stripped
    USER_START                                                                                                USER_END
 
 ```
+
+### 修改 `__switch_to`
+
+在前面新增了 sepc、sstatus、sscratch 之后，需要将这些变量在切换进程时保存在栈上，因此需要更新 `__switch_to` 中的逻辑，同时需要增加切换页表的逻辑。在切换了页表之后，需要通过 `sfence.vma` 来刷新 TLB 和 ICache。
 
 ### 更新中断处理逻辑
 
@@ -338,26 +338,26 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
     switch to [PID = 2 COUNTER = 10]
     [U-MODE] pid: 2, sp is 0000003fffffffe0, this is print No.1
     [U-MODE] pid: 2, sp is 0000003fffffffe0, this is print No.2
-
+    
     switch to [PID = 1 COUNTER = 7]
     [U-MODE] pid: 1, sp is 0000003fffffffe0, this is print No.1
-
+    
     switch to [PID = 3 COUNTER = 4]
     [U-MODE] pid: 3, sp is 0000003fffffffe0, this is print No.1
-
+    
     switch to [PID = 4 COUNTER = 1]
     [U-MODE] pid: 4, sp is 0000003fffffffe0, this is print No.1
     SET [PID = 1 PRIORITY = 7 COUNTER = 7]
     SET [PID = 2 PRIORITY = 10 COUNTER = 10]
     SET [PID = 3 PRIORITY = 4 COUNTER = 4]
     SET [PID = 4 PRIORITY = 1 COUNTER = 1]
-
+    
     switch to [PID = 2 COUNTER = 10]
     [U-MODE] pid: 2, sp is 0000003fffffffe0, this is print No.3
-
+    
     switch to [PID = 1 COUNTER = 7]
     [U-MODE] pid: 1, sp is 0000003fffffffe0, this is print No.2
-
+    
     switch to [PID = 3 COUNTER = 4]
     [U-MODE] pid: 3, sp is 0000003fffffffe0, this is print No.2
     ...
@@ -409,27 +409,27 @@ ELF 文件中包含了将程序加载到内存所需的信息，当我们通过 
     L (link order), O (extra OS processing required), G (group), T (TLS),
     C (compressed), x (unknown), o (OS specific), E (exclude),
     D (mbind), p (processor specific)
-
+    
     There are no section groups in this file.
-
+    
     Program Headers:
     Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
     RISCV_ATTRIBUT 0x0011f8 0x0000000000000000 0x0000000000000000 0x00004e 0x000000 R   0x1
     LOAD           0x0000e8 0x00000000000100e8 0x00000000000100e8 0x0010f1 0x0024e8 RWE 0x8
     GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10
-
+    
     Section to Segment mapping:
     Segment Sections...
     00     .riscv.attributes 
     01     .text .rodata .bss 
     02     
-
+    
     There is no dynamic section in this file.
-
+    
     There are no relocations in this file.
-
+    
     The decoding of unwind sections for machine type RISC-V is not currently supported.
-
+    
     Symbol table '.symtab' contains 41 entries:
     Num:    Value          Size Type    Bind   Vis      Ndx Name
         0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
@@ -473,7 +473,7 @@ ELF 文件中包含了将程序加载到内存所需的信息，当我们通过 
         38: 00000000000121d9     0 NOTYPE  GLOBAL DEFAULT    2 __DATA_BEGIN__
         39: 00000000000121d9     0 NOTYPE  GLOBAL DEFAULT    2 _edata
         40: 00000000000125d0     0 NOTYPE  GLOBAL DEFAULT    3 _end
-
+    
     No version information found in this file.
     Attribute Section: riscv
     File Attributes
