@@ -109,6 +109,10 @@ Breakpoint 1, 0x000000008000babe in _never_gonna_give_you_up ()
 
 升级完成后，务必尽快重启，不论是物理机还是虚拟机（WSL、Docker）。
 
+## 不知道如何计算 Lab3 建立映射时所需的虚拟地址 `va` 和大小 `sz`？
+
+在 `vmlinux.lds` 中有 `_stext`, `_srodata` 等符号，可以在代码里这样来声明它：`extern char _stext[]`，这样就可以通过 `_stext` 获得其所在虚拟地址 `va`，并且可以通过两个段的开头符号做减法获得段的大小 `sz`。
+
 <!--
 ## 为什么我的 QEMU 会 “卡住”？
 
