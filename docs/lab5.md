@@ -68,7 +68,7 @@ ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsysca
 
 #### Demand Paging
 
-Demand Paging 遵循的原则是，只有在执行进程需要时，才应将页面放入内存中。这样做的好处是，仅加载执行进程所需的页面，从而节省内存空间。例如，若一个页面从未被访问过，那么它就不需要被放入内存中。
+Demand paging 遵循的原则是，只有在执行进程需要时，才应将页面放入内存中。这样做的好处是，仅加载执行进程所需的页面，从而节省内存空间。例如，若一个页面从未被访问过，那么它就不需要被放入内存中。
 
 在 Lab4 的代码中，我们在 `task_init` 的时候创建了用户栈，`load_program` 的时候拷贝了 load segment，并通过 `create_mapping` 在页表中创建了映射。在本次实验中，我们将修改为 demand paging 的方式，也就是在初始化 task 的时候不进行任何的映射（除了内核栈以及页表以外也不需要开辟其他空间），而是在发生缺页异常的时候检测到是记录在 vma 中的合法地址后，再分配页面并进行映射。
 
@@ -215,7 +215,7 @@ struct task_struct {
 
 每一个 `vm_area_struct` 都对应于 task 地址空间的唯一**连续**区间。
 
-为了支持 `Demand Paging`，我们需要支持对 vm_area_struct 的添加和查找：
+为了支持 demand paging，我们需要支持对 `vm_area_struct` 的添加和查找：
 
 * `find_vma` 函数：实现对 `vm_area_struct` 的查找
     * 根据传入的地址 `addr`，遍历链表 `mm` 包含的 VMA 链表，找到该地址所在的 `vm_area_struct`
