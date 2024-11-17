@@ -619,6 +619,106 @@ __ret_from_fork:
 !!! question "`make run TEST=FORK3`"
     FORK3 的代码中有三个 `fork`，预期输出并不在这里呈现，需要你自己通过分析代码的预期结果来判断输出是否正确。同一个程序里多个 `fork` 也是在考试中较常见的题目，希望同学们可以通过本次实验以及分析这个测试更好掌握 fork 的原理。
 
+#### 写时复制 COW
+
+!!! abstract "此部分不要求完成，感兴趣的同学可以自行实现，完成本部分可以免写前四道思考题"
+
+COW 的核心是，再将 `do_fork` 中分配页面、拷贝内容的操作后移，移动到出现写操作的时候再进行拷贝，这样如果是只读的页面就可以在父子进程之间共享，免去拷贝的开销。
+
+因为要共享页面，所以我们要稍微更改 `mm.c` 中的 buddy system，为每个页添加一个引用计数 refcnt：
+
+??? info "mm.h mm.c 的具体修改"
+
+    ```c title="arch/riscv/include/mm.h"
+    struct buddy {
+    uint64_t size;
+    uint64_t *bitmap; 
+    uint64_t *ref_cnt;
+    };
+
+    uint64_t get_page(void *);          // 增加计数
+    void put_page(void *);              // 减少计数
+    uint64_t get_page_refcnt(void *);   // 获取计数
+    ```
+
+    ```c title="arch/riscv/kernel/mm.c"
+    void buddy_init() {
+        ...
+        memset(buddy.bitmap, 0, 2 * buddy.size * sizeof(*buddy.bitmap));
+
+        buddy.ref_cnt = free_page_start;
+        free_page_start += buddy.size * sizeof(*buddy.ref_cnt);
+        memset(buddy.ref_cnt, 0, buddy.size * sizeof(*buddy.ref_cnt));
+        ...
+    }
+
+    void page_ref_inc(uint64_t pfn) {
+        buddy.ref_cnt[pfn]++;
+    }
+
+    void page_ref_dec(uint64_t pfn) {
+        if (buddy.ref_cnt[pfn] > 0) {
+            buddy.ref_cnt[pfn]--;
+        }
+        if (buddy.ref_cnt[pfn] == 0) {
+            Log("free page: %p", PFN2PHYS(pfn));
+            buddy_free(pfn);
+        }
+    }
+
+    void buddy_free(uint64_t pfn) {
+        // if ref_cnt is not zero, do nothing
+        if (buddy.ref_cnt[pfn]) {
+            return;
+        }
+        ...
+    }
+
+    uint64_t buddy_alloc(uint64_t nrpages) {
+        ...
+        buddy.bitmap[index] = 0;
+        pfn = (index + 1) * node_size - buddy.size;
+        buddy.ref_cnt[pfn] = 1;
+        ...
+    }
+
+    uint64_t get_page(void *va) {
+        uint64_t pfn = PHYS2PFN(VA2PA((uint64_t)va));
+        // check if the page is already allocated
+        if (buddy.ref_cnt[pfn] == 0) {
+            return 1;
+        }
+        page_ref_inc(pfn);
+        return 0;
+    }
+
+    uint64_t get_page_refcnt(void *va) {
+        uint64_t pfn = PHYS2PFN(VA2PA((uint64_t)va));
+        return buddy.ref_cnt[pfn];
+    }
+
+    void put_page(void *va) {
+        uint64_t pfn = PHYS2PFN(VA2PA((uint64_t)va));
+        page_ref_dec(pfn);
+    }
+    ```
+
+接下来在我们 `do_fork` 创建页面、拷贝内容、创建页表的时候，只需要：
+
+- 将物理页的引用计数加一
+- 将父进程的该地址对应的页表项的 `PTE_W` 位置 0
+    - 注意因为修改了页表项权限，所以全部修改完成后需要通过 `sfence.vma` 刷新 TLB
+- 为子进程创建一个新的页表项，指向父进程的物理页，且权限不带 `PTE_W`
+
+这样在父子进程想要写入的时候，就会触发 page fault，然后再由我们在 page fault handler 中进行 COW。在 handler 中，我们只需要判断，如果发生了写错误，且 vma 的 `VM_WRITE` 位为 1，而且对应地址有 pte（进行了映射）但 pte 的 `PTE_W` 位为 0，那么就可以断定这是一个写时复制的页面，我们只需要在这个时候拷贝一份原来的页面，重新创建一个映射即可。
+
+!!! tip "关于引用计数"
+    拷贝了页面之后，别忘了将原来的页面引用计数减一。这样父子进程想要写入的时候，都会触发 COW，并拷贝一个新页面，都拷贝完成后，原来的页面将自动 free 掉。
+
+    进一步的，父进程 COW 后，子进程再进行写入的时候，也可以在这时判断引用计数，如果计数为 1，说明这个页面只有一个引用，那么就可以直接将 pte 的 `PTE_W` 位再置 1，这样就可以直接写入了，免去一次额外的复制。
+
+正确完成后，前面的测试应该都能正常完成。同时建议大家输出一些 COW 的信息来验证实现是否正确。
+
 ## 思考题
 
 1. 呈现出你在 page fault 的时候拷贝 ELF 程序内容的逻辑。
@@ -627,8 +727,8 @@ __ret_from_fork:
     - 在 do_fork 中，子进程的内核栈和用户栈指针的值应该是什么？
     - 在 do_fork 中，子进程的内核栈和用户栈指针分别应该赋值给谁？
 1. 为什么要为子进程 `pt_regs` 的 `sepc` 手动加四？
-1. 画图分析 `make run TEST=FORK3` 的进程 fork 过程，并呈现出各个进程的 `global_variable` 应该从几开始输出，再与你的输出进行对比验证。
 1. 对于 `Fork main #2`（即 `FORK2`），在运行时，`ZJU OS Lab5` 位于内存的什么位置？是否在读取的时候产生了 page fault？请给出必要的截图以说明。
+1. 画图分析 `make run TEST=FORK3` 的进程 fork 过程，并呈现出各个进程的 `global_variable` 应该从几开始输出，再与你的输出进行对比验证。
 
 ## 实验任务与要求
 
