@@ -6,7 +6,7 @@ spike_run: all
 
 spike_debug: all
 	@echo Launch spike for debug...
-	@spike -H --rbb-port=9824 --kernel=arch/riscv/boot/Image $(SPIKE_CONFIG)/fw_jump.elf
+	@spike --halted --rbb-port=9824 --kernel=arch/riscv/boot/Image $(SPIKE_CONFIG)/fw_jump.elf
 
 spike_bridge:
 	@echo Launch OpenOCD...
