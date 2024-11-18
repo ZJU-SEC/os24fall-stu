@@ -23,6 +23,7 @@ void kfree(void *addr) {
     struct run *r;
 
     // PGSIZE align 
+    //PGROUNDDOWN
     *(uintptr_t *)&addr = (uintptr_t)addr & ~(PGSIZE - 1);
 
     memset(addr, 0x0, (uint64_t)PGSIZE);

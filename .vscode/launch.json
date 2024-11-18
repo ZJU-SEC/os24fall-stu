@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+          "name": "kernel-debug",  // 调试名称
+          "type": "cppdbg",
+          "request": "launch",
+          "miDebuggerServerAddress": "localhost:1234",
+          "program": "/home/gsy/os24fall-stu/src/lab2/vmlinux",
+          "args": [],
+          "stopAtEntry": true,
+          "externalConsole": false,
+          "cwd": "/home/gsy/os24fall-stu",
+          "environment": [],
+          "logging": {
+            "engineLogging": false
+          },
+          "MIMode": "gdb",
+          "setupCommands": [
+            {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+            }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb-multiarch",
+      },
+    ]
+  }
