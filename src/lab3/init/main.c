@@ -1,5 +1,5 @@
 #include "printk.h"
-//#include "defs.h"
+#include "defs.h"
 
 extern void test();
 
