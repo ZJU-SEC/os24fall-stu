@@ -200,7 +200,7 @@ for GNU/Linux 3.2.0, not stripped
 
 * 对于每个进程，初始化我们刚刚在 `thread_struct` 中添加的三个变量，具体而言：
     * 将 `sepc` 设置为 `USER_START`
-    * 配置 `sstatus` 中的 `SPP`（使得 sret 返回至 U-Mode）、`SPIE`（sret 之后开启中断）、`SUM`（S-Mode 可以访问 User 页面）
+    * 配置 `sstatus` 中的 `SPP`（使得 sret 返回至 U-Mode）、`SUM`（S-Mode 可以访问 User 页面）
     * 将 `sscratch` 设置为 U-Mode 的 sp，其值为 `USER_END` （将用户态栈放置在 user space 的最后一个页面）
 * 对于每个进程，创建属于它自己的页表：
     * 为了避免 U-Mode 和 S-Mode 切换的时候切换页表，我们将内核页表 `swapper_pg_dir` 复制到每个进程的页表中
@@ -326,6 +326,13 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
 * 在之前的 lab 中，在 OS boot 之后，我们需要等待一个时间片，才会进行调度，我们现在更改为 OS boot 完成之后立即调度 uapp 运行
     * 即在 `start_kernel()` 中，`test()` 之前调用 `schedule()`
 * 将 `head.S` 中设置 sstatus.SIE 的逻辑注释掉，确保 schedule 过程不受中断影响
+
+!!! note "关于 SIE 与 SPIE"
+    这里保持 sstatus.SIE 为 0 可以在 S 态禁用中断来防止被时钟中断打断。曾经我们让大家在用户态进程初始化的时候设置 sstatus.SPIE 使得进入用户态进程后 sstatus.SIE 自动被置为 sstatus.SPIE 的值（即 1），这样在用户态进程中可以接收到时钟中断。但是 [RISC-V Privileged Spec](https://github.com/riscv/riscv-isa-manual/releases/download/20240411/priv-isa-asciidoc.pdf) 第 3.1.6.1 节写道：
+
+    > When a hart is executing in privilege mode *x*, interrupts are globally enabled when *x*IE=1 and globally disabled when *x*IE=0. ... Interrupts for higher-privilege modes, *y*>*x*, are always globally enabled regardless of the setting of the global *y*IE bit for the higher-privilege mode.
+
+    也就是说 CPU 在用户态 *x*=U 运行的时候，不论高特权级（*y*=S）的 SIE 位是否为 1，都会全局开启高特权级的中断。所以在用户态不管 sstatus.SIE 如何设置，都会始终接收到 S 态的时钟中断，因此之前对于 sstatus.SPIE 的设置并无必要。
 
 ### 测试纯二进制文件
 
