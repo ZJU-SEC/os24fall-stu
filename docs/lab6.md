@@ -263,7 +263,7 @@ int64_t sys_write(unsigned int fd, const char* buf, uint64_t count) {
 至此，你已经能够打印出 `stdout` 的输出了。
 
 ```plaintext
-2023 Hello RISC-V
+2024 Hello RISC-V
 hello, stdout!
 ```
 
@@ -272,7 +272,7 @@ hello, stdout!
 仿照 `stdout` 的输出过程，完成 `stderr` 的写入，让 `nish` 可以正确打印出
 
 ```plaintext
-2023 Hello RISC-V
+2024 Hello RISC-V
 hello, stdout!
 hello, stderr!
 SHELL >
@@ -548,7 +548,7 @@ int64_t fat32_write(struct file* file, const void* buf, uint64_t len) {
 [S] proc_init done!
 [S] virtio_blk_init done!
 [S] fat32 partition init done!
-2023 Hello RISC-V
+2024 Hello RISC-V
 ...
 ...
 hello, stdout!
