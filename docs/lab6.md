@@ -1,37 +1,37 @@
 # Lab6: VFS & FAT32 文件系统
 
-!!! warning "实验尚未修改完成，偷跑有返工风险"
-
-本实验中不涉及 `fork` 的实现和缺页异常，只需要完成 Lab4 即可开始本实验（当然，本实验也兼容 Lab5 ）。
+!!! abstract "本实验为 bonus，不做硬性要求"
 
 ## 实验目的
 
-* 为用户态的 Shell 提供 `read` 和 `write` syscall 的实现（完成该部分的所有实现方得 60 分）。
-* 实现 FAT32 文件系统的基本功能，并对其中的文件进行读写（完成该部分的所有实现方得 40 分）。
+* 为用户态的 Shell 提供 `read` 和 `write` syscall 的实现（完成该部分的所有实现方得 60 分）
+* 实现 FAT32 文件系统的基本功能，并对其中的文件进行读写（完成该部分的所有实现方得 40 分）
 
 ## 实验环境
 
-与先前的实验中使用的环境相同。
+* Environment in previous labs
 
 ## 背景知识
 
 ### VFS
 
-虚拟文件系统(VFS)或虚拟文件系统交换机是位于更具体的文件系统之上的抽象层。VFS的目的是允许客户端应用程序以统一的方式访问不同类型的具体文件系统。例如，可以使用VFS透明地访问本地和网络存储设备，而客户机应用程序不会注意到其中的差异。它可以用来弥合Windows、经典Mac OS/macOS和Unix文件系统之间的差异，这样应用程序就可以访问这些类型的本地文件系统上的文件，而不必知道它们正在访问什么类型的文件系统。
+虚拟文件系统（Virtual File System，VFS）或虚拟文件系统交换机是位于更具体的文件系统之上的抽象层。VFS 的目的是允许客户端应用程序以统一的方式访问不同类型的具体文件系统。例如，可以使用 VFS 透明地访问本地和网络存储设备，而客户机应用程序不会注意到其中的差异。它可以用来弥合 Windows、macOS 等不同操作系统所使用的文件系统之间的差异，这样应用程序就可以访问这些类型的本地文件系统上的文件，而不必知道它们正在访问什么类型的文件系统。
 
-VFS指定内核和具体文件系统之间的接口(或“协议”)。因此，只需完成协议，就可以很容易地向内核添加对新文件系统类型的支持。协议可能会随着版本的不同而不兼容地改变，这将需要重新编译具体的文件系统支持，并且可能在重新编译之前进行修改，以允许它与新版本的操作系统一起工作;或者操作系统的供应商可能只对协议进行向后兼容的更改，以便为操作系统的给定版本构建的具体文件系统支持将与操作系统的未来版本一起工作。
+VFS 指定内核和具体文件系统之间的接口（或“协议”）。因此，只需完成协议，就可以很容易地向内核添加对新文件系统类型的支持。协议可能会随着版本的不同而不兼容地改变，这将需要重新编译具体的文件系统支持，并且可能在重新编译之前进行修改，以允许它与新版本的操作系统一起工作；或者操作系统的供应商可能只对协议进行向后兼容的更改，以便为操作系统的给定版本构建的具体文件系统支持将与操作系统的未来版本一起工作。
 
 ### VirtIO
 
-Virtio 是一个开放标准，它定义了一种协议，用于不同类型的驱动程序和设备之间的通信。在 QEMU 上我们可以基于 VirtIO 使用许多模拟出来的外部设备，在本次实验中我们使用 VirtIO 模拟存储设备，并在其上构建文件系统。
+VirtIO 是一个开放标准，它定义了一种协议，用于不同类型的驱动程序和设备之间的通信。在 QEMU 上我们可以基于 VirtIO 使用许多模拟出来的外部设备，在本次实验中我们使用 VirtIO 模拟存储设备，并在其上构建文件系统。
+
+!!! note "本次实验中涉及 VirtIO 的部分已经为大家实现好了，同学们只需要调用相关函数即可"
 
 ### MBR
 
-主引导记录（英语：Master Boot Record，缩写：MBR），又叫做主引导扇区，是计算机开机后访问硬盘时所必须要读取的首个扇区，它在硬盘上位于第一个扇区。在深入讨论主引导扇区内部结构的时候，有时也将其开头的446字节内容特指为“主引导记录”（MBR），其后是4个16字节的“磁盘分区表”（DPT），以及2字节的结束标志（55AA）。因此，在使用“主引导记录”（MBR）这个术语的时候，需要根据具体情况判断其到底是指整个主引导扇区，还是主引导扇区的前446字节。
+主引导记录（Master Boot Record，MBR），又叫做主引导扇区，是计算机开机后访问硬盘时所必须要读取的首个扇区，它在硬盘上位于第一个扇区。在深入讨论主引导扇区内部结构的时候，有时也将其开头的 446 字节内容特指为“主引导记录”（MBR），其后是 4 个 16 字节的“磁盘分区表”（DPT），以及 2 字节的结束标志（55AA）。因此，在使用“主引导记录”（MBR）这个术语的时候，需要根据具体情况判断其到底是指整个主引导扇区，还是主引导扇区的前 446 字节。
 
 ### FAT32
 
-文件分配表（File Allocation Table，首字母缩略字：FAT），是一种由微软发明并拥有部分专利的文件系统，供MS-DOS使用，也是所有非NT核心的Windows系统使用的文件系统。最早的 FAT 文件系统直接使用扇区号来作为存储的索引，但是这样做的缺点是显然易见的：当磁盘的大小不断扩大，存储扇区号的位数越来越多，越发占用存储空间。以 32 位扇区号的文件系统为例，如果磁盘的扇区大小为 512B，那么文件系统能支持的最大磁盘大小仅为 2TB。
+文件分配表（File Allocation Table，FAT），是一种由微软发明并拥有部分专利的文件系统，供 MS-DOS 使用，也是所有非 NT 核心的 Windows 系统使用的文件系统。最早的 FAT 文件系统直接使用扇区号来作为存储的索引，但是这样做的缺点是显然易见的：当磁盘的大小不断扩大，存储扇区号的位数越来越多，越发占用存储空间。以 32 位扇区号的文件系统为例，如果磁盘的扇区大小为 512B，那么文件系统能支持的最大磁盘大小仅为 2TB。
 
 所以在 FAT32 中引入的新的存储管理单位“簇”，一个簇包含一个或多个扇区，文件系统中记录的索引不再为扇区号，而是**簇号**，以此来支持更大的存储设备。你可以参考这些资料来学习 FAT32 文件系统的标准与实现：
 
@@ -39,300 +39,260 @@ Virtio 是一个开放标准，它定义了一种协议，用于不同类型的�
 - [Microsoft FAT Specification](https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf)
 
 !!! note "上述两个材料对于完成本次实验非常关键，希望同学们仔细阅读"
-    - [FAT32文件系统？盘它！](https://www.youtube.com/watch?v=YfDU6g0CmZE&t=344s) 里提到的“块”可以对标本次实验里的“扇区”（sector）。`fat32_init` 函数里各种参数的计算方式可以参考本视频；
-    - [Microsoft FAT Specification](https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf) 是本次实验参考的标准。`fat32_bpb` `fat32_dir_entry` 等结构体各个字段的含义，可以直接参考本材料。例如：
+    - [FAT32文件系统？盘它！](https://www.youtube.com/watch?v=YfDU6g0CmZE&t=344s) 里提到的“块”可以对标本次实验里的“扇区”（sector）
+        - `fat32_init` 函数里各种参数的计算方式可以参考本视频；
+    - [Microsoft FAT Specification](https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf) 是本次实验参考的标准，`fat32_bpb` `fat32_dir_entry` 等结构体各个字段的含义，可以直接参考本材料，例如：
         - Page 7 讲解了 `fat32_bpb`，在 `fat32_init` 中用得上；
-        - Page 23 处讲解了 `fat32_dir_entry`，在文件操作函数中用得上；
+        - Page 23 处讲解了 `fat32_dir_entry`，在文件操作函数中用得上。
 
 ## 实验步骤
 
+本次实验的内容分为两个部分：
+
+- Shell：实现 VFS，编写虚拟文件设备 stdin, stdout, stderr 的读写操作；
+- FAT32：实现 FAT32 文件系统的读写操作。
+
+!!! note "本实验中不涉及 fork 的实现和缺页异常，只需要完成 Lab4 即可开始本实验（当然，本实验也兼容 Lab5）"
+
+### 准备工作
+
+!!! tip "代码与调试建议"
+    框架代码中可能会使用到 `Log` `Err` 宏或者其他你可能未定义的东西，如果编译时出现报错可以自行补充，如果有不清楚的奇怪报错可以询问助教。
+
+    在本次实验中，以往实验的部分可能会变得完全不重要，因为本次实验中只需要考虑文件系统和系统调用，所以你可以选择将原来调试用的 Log 宏禁用，以减少输出，比如在根目录下的 Makefile 中：
+
+    ```Makefile
+    LOG		:= 1
+    CFLAG	:= ... -DLOG=$(LOG)
+    ```
+
+    然后在 `include/printk.h` 中：
+
+    ```c title="include/printk.h"
+    #if LOG
+    #define Log(format, ...) \
+        printk("\33[1;35m[%s,%d,%s] " format "\33[0m\n", \
+            __FILE__, __LINE__, __func__, ## __VA_ARGS__)
+    #else
+    #define Log(format, ...);
+    #endif
+    ```
+
+    这样在 `make run LOG=0` 时就不会输出 Log 信息了。
+
+此次实验基于 lab4/5 同学所实现的代码进行。
+
+* 从仓库同步以下文件：
+    ```text
+    src/lab6
+      ├── disk.img.zip  // FAT32 磁盘镜像，需解压
+      ├── fs
+      │   ├── Makefile
+      │   ├── fat32.c   // FAT32 文件系统实现
+      │   ├── fs.c      // 供系统内核使用的文件系统相关函数实现
+      │   ├── mbr.c     // MBR 初始化（无需修改）
+      │   ├── vfs.c     // VFS 实现
+      │   └── virtio.c  // VirtIO 驱动（无需修改）
+      ├── include
+      │   ├── fat32.h   // FAT32 相关数据结构与函数声明
+      │   ├── fs.h      // 供系统内核使用的文件系统相关数据结构及函数声明
+      │   ├── mbr.h     // MBR 相关数据结构与函数声明（无需关注）
+      │   ├── vfs.h     // VFS 操作函数声明
+      │   └── virtio.h  // VirtIO 驱动相关数据结构与函数声明（无需关注）
+      └── user              // 用户态程序部分不需同学们修改，所以这里给出完整的代码
+          ├── Makefile      // 未作修改
+          ├── link.lds      // 未作修改
+          ├── main.c    // nish 用户态程序（需要阅读）
+          ├── printf.c      // 未作修改
+          ├── start.S       // 未作修改
+          ├── stddef.h      // 未作修改
+          ├── stdint.h      // 同步了内核的 stdint.h
+          ├── stdio.h       // 未作修改
+          ├── string.c      // 新文件，添加了 strlen
+          ├── string.h      // 新文件，添加了 strlen
+          ├── syscall.h     // 更新了系统调用号
+          ├── uapp.S        // 未作修改
+          ├── unistd.c  // 系统调用实现（需要阅读）
+          └── unistd.h
+    ```
+* 同时需要修改 proc.h/c，在初始化时只创建一个用户态进程
+
 ### Shell: 与内核进行交互
 
-我们为大家提供了 `nish` 来与我们在实验中完成的 kernel 进行交互。`nish` (Not Implemented SHell) 提供了简单的用户交互和文件读写功能，有如下的命令。
+我们为大家提供了用户态程序 "nish" (Not Implemented SHell) 来与我们在实验中完成的 kernel 进行交互。它提供了简单的用户交互和文件读写功能，有如下的命令：
 
 ```bash
-echo [string] # 将 string 输出到 stdout
-cat  [path]   # 将路径为 path 的文件的内容输出到 stdout
-edit [path] [offset] [string] # 将路径为 path 的文件，
-            # 偏移量为 offset 的部分开始，写为 string
+echo [string]   # 将 string 输出到 stdout
+cat [path]      # 将路径为 path 的文件的内容输出到 stdout
+edit [path] [offset] [string] # 将路径为 path 的文件，偏移量为 offset 的部分开始，写为 string
 ```
 
-同步 `os24fall-stu` 中的 `user` 文件夹，替换原有的用户态程序为 `nish`。为了能够正确启动 QEMU，需要下载[磁盘镜像](https://drive.google.com/file/d/1CZF8z2v8ZyAYXT1DlYMwzOO1ohAj41-W/view?usp=sharing)并放置在项目目录下。同时，还需要将 `NR_TASKS` 修改为 2，也就是仅初始化 `nish` 这一个用户态进程。
+我们在启动一个用户态程序（包括 nish）时默认打开了三个文件，`stdin`，`stdout` 和 `stderr`，他们对应的 file descriptor 分别为 `0`，`1`，`2`。在 nish 启动时，会首先向 `stdout` 和 `stderr` 分别写入一段内容作为测试：
 
-```plaintext
-lab6
-├── Makefile
-├── disk.img
-├── arch
-│   └── riscv
-│       ├── Makefile
-│       └── include
-│          └── sbi.h
-├── fs
-│   ├── Makefile
-│   ├── fat32.c
-│   ├── fs.S
-│   ├── mbr.c
-│   ├── vfs.c
-│   └── virtio.c
-├── include
-│   ├── fat32.h
-│   ├── fs.h
-│   ├── mbr.h
-│   ├── string.h
-│   ├── debug.h
-│   ├── vfs.h
-│   └── virtio.h
-├── lib
-│   └── string.c
-└── user
-    ├── Makefile
-    ├── forktest.c
-    ├── link.lds
-    ├── printf.c
-    ├── ramdisk.S
-    ├── shell.c
-    ├── start.S
-    ├── stddef.h
-    ├── stdio.h
-    ├── string.h
-    ├── syscall.h
-    ├── unistd.c
-    └── unistd.h
-```
-
-此外，可能还要向 `include/types.h` 中补充一些类型别名 
-
-```c
-typedef unsigned long uint64_t;
-typedef long int64_t;
-typedef unsigned int uint32_t;
-typedef int int32_t;
-typedef unsigned short uint16_t;
-typedef short int16_t;
-typedef uint64_t* pagetable_t;
-typedef char int8_t;
-typedef unsigned char uint8_t;
-typedef uint64_t size_t;
-```
-
-还要修改一下 `arch/riscv/kernel/vmlinux.lds` 中的 `_sramdisk` 符号部分(将 uapp 修改为 ramdisk)
-
-```
-        _sramdisk = .;
-        *(.ramdisk .ramdisk*)
-        _eramdisk = .;
-```
-
-完成这一步后，可能你还需要调整一部分头文件引用和 `Makefile`，以让项目能够成功编译并运行。
-
-我们在启动一个用户态程序时默认打开了三个文件，`stdin`，`stdout` 和 `stderr`，他们对应的 file descriptor 分别为 `0`，`1`，`2`。在 `nish` 启动时，会首先向 `stdout` 和 `stderr` 分别写入一段内容，用户态的代码如下所示。
-
-```c
-// user/shell.c
-
+```c title="user/main.c" linenums="134"
 write(1, "hello, stdout!\n", 15);
 write(2, "hello, stderr!\n", 15);
 ```
 
-#### 处理 `stdout` 的写入
+而在这之前，我们也曾处理过 write 系统调用，不过当时是根据 stdin 的 fd 来特判的。接下来在本次实验中我们会将这一操作包装为文件系统的操作。
 
-我们在用户态已经像上面这样实现好了 `write` 函数来向内核发起 syscall，我们先在内核态完成真实的写入过程，也即将写入的字符输出到串口。
+#### 文件系统抽象
 
-```c
-// arch/riscv/include/syscall.h
+我们在 `include/fs.h` 中定义了文件系统的数据结构：
 
-int64_t sys_write(unsigned int fd, const char* buf, uint64_t count);
+```c title="include/fs.h" linenums="31"
+struct file {   // Opened file in a thread.
+    uint32_t opened;    // 文件是否打开
+    uint32_t perms;     // 文件的读写权限
+    int64_t cfo;        // 当前文件指针偏移量
+    uint32_t fs_type;   // 文件系统类型
 
-// arch/riscv/include/syscall.c
+    union {
+        struct fat32_file fat32_file;   // 后续 FAT32 文件系统的文件需要的额外信息
+    };
 
-void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs *regs) {
+    int64_t (*lseek) (struct file *file, int64_t offset, uint64_t whence);  // 文件指针操作
+    int64_t (*write) (struct file *file, const void *buf, uint64_t len);    // 写文件
+    int64_t (*read)  (struct file *file, void *buf, uint64_t len);          // 读文件
+
+    char path[MAX_PATH_LENGTH]; // 文件路径
+};
+
+struct files_struct {
+    struct file fd_array[MAX_FILE_NUMBER];
+};
+```
+
+可以看出我们为每个文件都保存了三个函数指针，这样针对不同文件的同一操作就可以调用到不同函数了。同时为了方便实现，我们直接通过数组来保存 file 结构体，默认情况下会创建 `MAX_FILE_NUMBER=16` 个可用的文件描述符。
+
+接下来需要同学们修改 proc.h，为进程 task_struct 结构体添加一个指向文件表的指针：
+
+```c title="arch/riscv/include/proc.h"
+struct task_struct {
     ...
-    if (scause == 0x8) { // syscalls
-        uint64_t sys_call_num = regs->a7;
-        ...
-        if (sys_call_num == SYS_WRITE) {
-            regs->a0 = sys_write(regs->a0, (const char*)(regs->a1), regs->a2);
-            regs->sepc = regs->sepc + 4;
-        } else {
-            printk("Unhandled Syscall: 0x%lx\n", regs->a7);
-            while (1);
-        }
-    }
-    ...
+    struct files_struct *files;
+};
+```
+
+#### stdout/err/in 初始化
+
+在 `fs/fs.c` 文件中，我们定义了一个函数 `file_init`：
+
+```c title="fs/fs.c" linenums="8"
+struct files_struct *file_init() {
+    // todo: alloc pages for files_struct, and initialize stdin, stdout, stderr
+    struct files_struct *ret = NULL;
+    return ret;
 }
 ```
 
-注意到我们使用的是 `fd` 来索引打开的文件，所以在该进程的内核态需要维护当前进程打开的文件，将这些文件的信息储存在一个表中，并在 `task_struct` 中指向这个表。
+这个函数需要大家在 proc.c 中的 `task_init` 函数中为每个进程调用，创建文件表并保存在 task struct 中。
+
+在这个函数中，你需要：
+
+- 根据 `files_struct` 的大小分配页空间
+- 为 stdin、stdout、stderr 赋值，比如 stdin 你可以：
+    ```c 
+    ret->fd_array[0].opened = 1;
+    ret->fd_array[0].perms = FILE_READABLE;
+    ret->fd_array[0].cfo = 0;
+    ret->fd_array[0].lseek = NULL;
+    ret->fd_array[0].write = NULL;
+    ret->fd_array[0].read = ...;
+    ```
+    - 这里的 read / write 函数可以留到等下来实现
+- 保证其他未使用的文件的 `opened` 字段为 0
+
+#### 处理 stdout/err 的写入
+
+正如 4.2 开头所说，用户态程序在开始的时候会通过 `write` 函数来向内核发起 syscall 进行测试。在捕获到 write 的 syscall 之后，我们就可以查找对应的 fd，并通过对应的 write 函数调用来进行输出了。一个参考实现如下：
 
 ```c
-// include/fs.h
-
-struct file {
-    uint32_t opened;
-    uint32_t perms;
-    int64_t cfo;
-    uint32_t fs_type;
-
-    union {
-        struct fat32_file fat32_file;
-    };
-
-    int64_t (*lseek) (struct file* file, int64_t offset, uint64_t whence);
-    int64_t (*write) (struct file* file, const void* buf, uint64_t len);
-    int64_t (*read)  (struct file* file, void* buf, uint64_t len);
-
-    char path[MAX_PATH_LENGTH];
-};
-
-// arch/riscv/include/proc.h
-
-struct task_struct {
-    ...
-    struct file *files;
-    ...
-};
-```
-
-首先要做的是在创建进程时为进程初始化文件，当初始化进程时，先完成打开的文件的列表的初始化，这里我们的方式是直接分配一个页，并用 `files` 指向这个页。
-
-```c
-// fs/vfs.c
-
-struct file* file_init() {
-    struct file *ret = (struct file*)alloc_page();
-
-    // stdin
-    ret[0].opened = 1;
-    ...
-
-    // stdout
-    ret[1].opened = 1;
-    ret[1].perms = FILE_WRITABLE;
-    ret[1].cfo = 0;
-    ret[1].lseek = NULL;
-    ret[1].write = /* todo */;
-    ret[1].read = NULL;
-    memcpy(ret[1].path, "stdout", 7);
-
-    // stderr
-    ret[2].opened = 1;
-    ...
-
+int64_t sys_write(uint64_t fd, const char *buf, uint64_t len) {
+    int64_t ret;
+    struct file *file = &(current->files->fd_array[fd]);
+    if (file->opened == 0) {
+        printk("file not opened\n");
+        return ERROR_FILE_NOT_OPEN;
+    } else {
+        // check perms and call write function of file
+    }
     return ret;
 }
 
-int64_t stdout_write(struct file* file, const void* buf, uint64_t len) {
+void do_syscall(struct pt_regs* regs) {
+    switch (regs->a7) {
+        case SYS_WRITE:
+            regs->a0 = sys_write(regs->a0, (const char *)regs->a1, regs->a2);
+            break;
+        case SYS_GETPID:
+            regs->a0 = current->pid;
+            break;
+        case SYS_CLONE:
+            regs->a0 = do_fork(regs);
+            break;
+        default:
+            Err("not support syscall id = %d", regs->a7);
+    }
+    regs->sepc += 4;
+}
+```
+
+对于 stdout 和 stderr 的输出，我们直接通过 `printk` 进行串口输出即可：
+
+```c title="fs/vfs.c" linenums="22"
+int64_t stdout_write(struct file *file, const void *buf, uint64_t len) {
     char to_print[len + 1];
     for (int i = 0; i < len; i++) {
-        to_print[i] = ((const char*)buf)[i];
+        to_print[i] = ((const char *)buf)[i];
     }
     to_print[len] = 0;
     return printk(buf);
 }
 
-// arch/riscv/kernel/proc.c
-void task_init() {
-    ...
-    // Initialize the stdin, stdout, and stderr.
-    task[1]->files = file_init();
-    printk("[S] proc_init done!\n");
-    ...
+int64_t stdout_write(struct file *file, const void *buf, uint64_t len) {
+    // todo
 }
 ```
 
-可以看到每一个被打开的文件对应三个函数指针，这三个函数指针抽象出了每个被打开的文件的操作。也对应了 `SYS_LSEEK`，`SYS_WRITE`，和 `SYS_READ` 这三种 syscall. 最终由函数 `sys_write` 调用 `stdout` 对应的 `struct file` 中的函数指针 `write` 来执行对应的写串口操作。我们这里直接给出 `stdout_write` 的实现，只需要直接把这个函数指针赋值给 `stdout` 对应 `struct file` 中的 `write` 即可。
+实现好后，你应该已经能够打印出输出了：
 
-接着你需要实现 `sys_write` syscall，来间接调用我们赋值的 `stdout` 对应的函数指针。
-
-```c
-
-// arch/riscv/kernel/syscall.c
-
-int64_t sys_write(unsigned int fd, const char* buf, uint64_t count) {
-    int64_t ret;
-    struct file* target_file = &(current->files[fd]);
-    if (target_file->opened) {
-        /* todo: indirect call */
-    } else {
-        printk("file not open\n");
-        ret = ERROR_FILE_NOT_OPEN;
-    }
-    return ret;
-}
-```
-
-至此，你已经能够打印出 `stdout` 的输出了。
-
-```plaintext
-2024 Hello RISC-V
-hello, stdout!
-```
-
-#### 处理 `stderr` 的写入
-
-仿照 `stdout` 的输出过程，完成 `stderr` 的写入，让 `nish` 可以正确打印出
-
-```plaintext
-2024 Hello RISC-V
+```text
+2024 ZJU Operating System
 hello, stdout!
 hello, stderr!
 SHELL >
 ```
 
-#### 处理 `stdin` 的读取
+#### 处理 stdin 的读取
 
-此时 `nish` 已经打印出命令行等待输入命令以进行交互了，但是还需要读入从终端输入的命令才能够与人进行交互，所以我们要实现 `stdin` 以获取键盘键入的内容。
+此时 nish 已经打印出命令行等待输入命令以进行交互了，但是还需要读入从终端输入的命令才能够与人进行交互，所以我们要实现 `stdin` 以获取键盘键入的内容。
 
-在终端中已经实现了不断读 `stdin` 文件来获取键入的内容，并解析出命令，你需要完成的只是响应如下的系统调用：
+对于输入的读取就是对于 fd=0 的 stdin 文件进行 read 操作，所以需要我们实现 vfs.c 中的 stdin_read 函数。而对于终端的输入，我们需要通过 sbi 来完成，需要大家在 `arch/riscv/include/sbi.h` 中添加函数：
 
-```c
-// user/shell.c
-
-read(0, read_buf, 1);
+```c title="arch/riscv/include/sbi.h"
+struct sbiret sbi_debug_console_read(uint64_t num_bytes, uint64_t base_addr_lo, uint64_t base_addr_hi);
 ```
 
-代码框架中已经实现了一个在内核态用于向终端读取一个字符的函数，你需要调用这个函数来实现你的 `stdin_read`.
+并在 sbi.c 中进行实现（eid 和 `console_write_byte` 一样为 `0x4442434e`，fid 为 2）。其中参数 `num_bytes` 为读取的字节数，`base_addr_lo` 和 `base_addr_hi` 为写入的目的地址（`base_addr_hi` 在 64 位架构中不会用到）。
 
-```c
-// fs/vfs.c
+接下来在 vfs.c 中我们为大家定义了函数 `uart_getchar()`，因为 `sbi_debug_console_read` 是非阻塞的，所以我们需要一个函数来不断进行读取，直到读到了有效字符，然后在 `stdin_read` 中只需要这样读取 `len` 个字符就好了。
 
-char uart_getchar() {
-    /* already implemented in the file */
-}
+!!! note "关于 read 阻塞的说明"
+    同学们可以发现我们这里实现的 `read` 其实是完全阻塞的，即读取到了 `len` 个字符才会返回，实际上这只是简化的操作。
 
-int64_t stdin_read(struct file* file, void* buf, uint64_t len) {
-    /* todo: use uart_getchar() to get <len> chars */
-}
+    实际情况下 `read` 只会在没有任何输入的情况下阻塞，一旦可以读到数据，则不论是否达到 `len` 都会立即返回，但本次实验中不考虑这种情况即可。
+
+完成了 `stdin_read` 后，还需要捕获 63 号系统调用 read，来和 write 一样类似处理即可。
+
+全部完成后，你应该就可以在 nish 中使用 `echo` 命令了：
+
+```text
+SHELL > echo "test"
+test
 ```
 
-接着参考 `syscall_write` 的实现，来实现 `syscall_read`.
-
-```c
-
-// arch/riscv/kernel/syscall.c
-
-int64_t sys_read(unsigned int fd, char* buf, uint64_t count) {
-    int64_t ret;
-    struct file* target_file = &(current->files[fd]);
-    if (target_file->opened) {
-        /* todo: indirect call */
-    } else {
-        printk("file not open\n");
-        ret = ERROR_FILE_NOT_OPEN;
-    }
-    return ret;
-}
-```
-
-至此，就可以在 `nish` 中使用 `echo` 命令了。
-
-```
-SHELL > echo "this is echo"
-this is echo
-```
-
-### FAT32: 持久存储
+### FAT32：持久存储
 
 在本次实验中我们仅需实现 FAT32 文件系统中很小一部分功能，我们为实验中的测试做如下限制：
 
@@ -344,163 +304,170 @@ this is echo
 #### 准备工作
 ##### 利用 VirtIO 为 QEMU 添加虚拟存储
 
-我们为大家构建好了[磁盘镜像](https://drive.google.com/file/d/1CZF8z2v8ZyAYXT1DlYMwzOO1ohAj41-W/view?usp=sharing)，其中包含了一个 MBR 分区表以及一个存储有一些文件的 FAT32 分区。可以使用如下的命令来启动 QEMU，并将该磁盘连接到 QEMU 的一个 VirtIO 接口上，构成一个 `virtio-blk-device`。
+我们为大家准备了一个 FAT32 的磁盘映像，其中包含了一个 MBR 分区表以及一个存储有一些文件的 FAT32 分区，需要大家解压 `src/lab6/disk.img.zip` 得到 `disk.img` 并放在根目录下。
+
+接下来可以使用如下的命令来启动 QEMU，这会将磁盘连接到 QEMU 的一个 VirtIO 接口上，构成一个 `virtio-blk-device`：
 
 ```Makefile
 run: all
-    @echo Launch the qemu ......
-    @qemu-system-riscv64 \
-        -machine virt \
-        -nographic \
-        -bios default \
-        -kernel vmlinux \
-        -global virtio-mmio.force-legacy=false \
-        -drive file=disk.img,if=none,format=raw,id=hd0 \
-        -device virtio-blk-device,drive=hd0
+	@echo Launch qemu...
+	@qemu-system-riscv64 -nographic -machine virt -kernel vmlinux -bios default \
+		-global virtio-mmio.force-legacy=false \
+		-drive file=disk.img,if=none,format=raw,id=hd0 \
+		-device virtio-blk-device,drive=hd0
+
+debug: all
+	@echo Launch qemu for debug...
+	@qemu-system-riscv64 -nographic -machine virt -kernel vmlinux -bios default \
+		-global virtio-mmio.force-legacy=false \
+		-drive file=disk.img,if=none,format=raw,id=hd0 \
+		-device virtio-blk-device,drive=hd0 -S -s
 ```
 
-`virtio` 所需的驱动我们已经为大家编写完成了，在 `fs/virtio.c` 中给出。
+VirtIO 所需的驱动我们已经为大家编写完成了，在 `fs/virtio.c` 中给出，为了正常使用这部分外设，还需要在 `setup_vm_final` 中添加对 VritIO 外设的映射：
 
-然后在 `setup_vm_final` 创建虚拟内存映射时，还需要添加映射 VritIO 外设部分的映射。
-
-```c
-// arch/riscv/kernel/vm.c
+```c title="arch/riscv/kernel/vm.c"
 create_mapping(swapper_pg_dir, io_to_virt(VIRTIO_START), VIRTIO_START, VIRTIO_SIZE * VIRTIO_COUNT, PTE_W | PTE_R | PTE_V);
 ```
 
+##### 初始化 VirtIO 与 MBR
 
-##### 初始化 MBR
+除了 VirtIO，我们还为大家实现了读取 MBR 这一磁盘初始化过程。该过程会搜索磁盘中存在的分区，然后对分区进行初步的初始化。
 
-我们为大家实现了读取 MBR 这一磁盘初始化过程。该过程会搜索磁盘中存在的分区，然后对分区进行初步的初始化。
+这两部分分别需要使用 `virtio_dev_init()` 和 `mbr_init()` 进行初始化，需要在 `head.S` 中 `task_init` 结束后调用。
 
-对 VirtIO 和 MBR 进行初始化的逻辑可以被添加在初始化第一个进程的 `task_init` 中
+#### 初始化 FAT32 分区
 
-```c
-// arch/riscv/kernel/proc.c
-void task_init() {
-    ...
-    printk("[S] proc_init done!\n");
+在 FAT32 分区的第一个扇区中存储了关于这个分区的元数据，首先需要读取并解析这些元数据。我们提供了两个数据结构的定义，`fat32_bpb` 为 FAT32 BIOS Parameter Block 的简写。这是一个物理扇区，其中对应的是这个分区的元数据。首先需要将该扇区的内容读到一个 `fat32_bpb` 数据结构中进行解析。
 
-    virtio_dev_init();
-    mbr_init();
-}
-```
-
-这样从第一个用户态进程被初始化完成开始，就能够直接使用 VirtIO，并使用初始化完成的 MBR 表了。
-
-##### 初始化 FAT32 分区
-
-在 FAT32 分区的第一个扇区中存储了关于这个分区的元数据，首先需要读取并解析这些元数据。我们提供了两个数据结构的定义，`fat32_bpb` 为 FAT32 BIOS Parameter Block 的简写。这是一个物理扇区，其中对应的是这个分区的元数据。首先需要将该扇区的内容读到一个 `fat32_bpb` 数据结构中进行解析。`fat32_volume` 是用来存储我们实验中需要用到的元数据的，需要根据 `fat32_bpb` 中的数据来进行计算并初始化。
+`fat32_volume` 是用来存储我们后续代码中需要用到的元数据的，需要根据 `fat32_bpb` 中的数据来进行计算并初始化。
 
 !!! note "为了简单起见，本次实验中每个簇都只包含 1 个扇区。所以你的代码可能会以各种灵车的方式跑起来，但是你仍需要对簇和扇区有所区分，并在报告里有所体现。"
 
-```c
-// fs/fat32.c
-
-struct fat32_bpb fat32_header;      // FAT32 metadata in the disk
-struct fat32_volume fat32_volume;   // FAT32 metadata to initialize
-
+```c title="fs/fat32.c" linenums="26"
 void fat32_init(uint64_t lba, uint64_t size) {
-    virtio_blk_read_sector(lba, (void*)&fat32_header);
-    fat32_volume.first_fat_sec = /* to calculate */;
-    fat32_volume.sec_per_cluster = /* to calculate */;
-    fat32_volume.first_data_sec = /* to calculate */;
-    fat32_volume.fat_sz = /* to calculate */;
-
-    virtio_blk_read_sector(fat32_volume.first_data_sec, fat32_buf); // Get the root directory
-    struct fat32_dir_entry *dir_entry = (struct fat32_dir_entry *)fat32_buf;
+    virtio_blk_read_sector(lba, (void*)&fat32_header);  // 从第 lba 个扇区读取 FAT32 BPB
+    fat32_volume.first_fat_sec = /* to calculate */;    // 记录第一个 FAT 表所在的扇区号
+    fat32_volume.sec_per_cluster = /* to calculate */;  // 每个簇的扇区数
+    fat32_volume.first_data_sec = /* to calculate */;   // 记录第一个数据簇所在的扇区号
+    fat32_volume.fat_sz = /* to calculate */;           // 记录每个 FAT 表占的扇区数（并未用到）
 }
-
 ```
+
+!!! tip "指导与调试建议"
+    为了完成这一部分，你需要了解 FAT32 中扇区的排列方式与用途。
+    
+    即 `lba` 扇区为 BPB，这之后紧接着的是一些保留扇区，然后是第一个 FAT 表所在的扇区（这个表会占很多个扇区，需要从 bpb 读取），接下来是第二个 FAT 表所在的扇区（为第一个 FAT 表的备份），然后接下来是数据区。
+
+    在得到这些之后，你可以尝试从 `fat32_volume.first_fat_sec` 读取一个扇区到 `fat32_buf` 中，如果正确的话，开头四个字节应该是 `F8FFFF0F`。
 
 !!! tip "物理层面读写扇区的原语"
     - 出于实验难度的考虑，物理层面通过 virtio 读写扇区的驱动函数已经写好；
         - `virtio_blk_read_sector` 可以将扇区号对应的扇区读入到一个 buffer 内；
         - `virtio_blk_write_sector` 可以将一个 buffer 的内容写入到特定扇区号的扇区里；
-    - 不论是 `openat` `read` `write` `lseek`，都可能需要分别调用读或者写原语，来完成跟扇区内容的交互；
+    - 不论是 `openat` `read` `write` `lseek`，都可能需要调用这两个函数，来完成跟扇区内容的交互；
 
-#### 读取 FAT32 文件
+!!! tip "更多调试建议"
+    你可以使用 16 进制文件查看软件打开 `disk.img` 文件，来查看其中的内容，每个扇区的大小都为 `VIRTIO_BLK_SECTOR_SIZE`。
 
+    虽然文件中大部分内容都为 0，但是你可以搜索得到一些有意义的部分：
 
+    - 字符串 `mkfs.fat`，这八个字节是 bpb 中的 oem 代号，即 `fat32_bpb->oem_name`；
+        - 根据这个位置，你可以找到 BPB 的开始位置；
+    - 字节序列 `F8 FF FF 0F`，这是 FAT 表的开头，也是第一个 FAT 项的内容；
+    - 字符串 `EMAIL`，这是我们要读取的文件的名字，它会在数据区开头的根目录扇区中出现，标志着一个短文件名目录项的开始；
+        - 你可能会看到有其他的目录项，你可以不用管它们，在本次实验中不会用到；
+    - 字符串 `From`，这是要读取的文件内容的开头，它也会处于一个扇区的开头。
 
-在读取文件之前，首先需要打开对应的文件，这需要实现 `openat` syscall.
+#### 完善系统调用
 
-```c
-// arch/riscv/syscall.c
+在读取文件之前，首先需要打开对应的文件，这需要实现 `openat` syscall，调用号为 56。你需要寻找一个空闲的文件描述符，然后调用 `file_open` 函数来初始化这个文件描述符。
 
-int64_t sys_openat(int dfd, const char* filename, int flags) {
-    int fd = -1;
+!!! note "关于判断文件系统类型"
+    我们使用最简单的判别文件系统的方式，文件前缀为 `/fat32/` 的即是本次 FAT32 文件系统中的文件，例如，在 `nish` 中我们尝试读取文件，使用的命令是 `cat /fat32/$FILENAME`. `file_open` 会根据前缀决定是否调用 `fat32_open_file` 函数（后面实现）。
 
-    // Find an available file descriptor first
-    for (int i = 0; i < PGSIZE / sizeof(struct file); i++) {
-        if (!current->files[i].opened) {
-            fd = i;
-            break;
-        }
-    }
+    注意因为我们的文件一定在 FAT32 的根目录下，也即 `/fat32/` 下，所以无需实现与目录遍历相关的逻辑。此外需要注意的是，需要将文件名统一转换为大写或小写，因为我们的实现是不区分大小写的。
 
-    // Do actual open
-    file_open(&(current->files[fd]), filename, flags);
+读取完成后 nish 会调用 close 来关闭文件，所以你需要实现 57 号系统调用 close，来为指定的文件描述符关闭文件。
 
-    return fd;
-}
+最后在 nish 处理 edit 的时候，会先进行 lseek 调整文件指针，然后再进行 write，所以你需要参考 write 和 read 实现类似的 62 号系统调用 lseek。
 
-void file_open(struct file* file, const char* path, int flags) {
-    file->opened = 1;
-    file->perms = flags;
-    file->cfo = 0;
-    file->fs_type = get_fs_type(path);
-    memcpy(file->path, path, strlen(path) + 1);
+#### 打开文件
 
-    if (file->fs_type == FS_TYPE_FAT32) {
-        file->lseek = fat32_lseek;
-        file->write = fat32_write;
-        file->read = fat32_read;
-        file->fat32_file = fat32_open_file(path);
-    } else if (file->fs_type == FS_TYPE_EXT2) {
-        printk("Unsupport ext2\n");
-        while (1);
-    } else {
-        printk("Unknown fs type: %s\n", path);
-        while (1);
-    }
-}
+接下来就是本次实验中比较复杂的部分了，首先在 `fat32_open_file` 函数中，我们需要读取出被打开的文件所在的簇和目录项位置的信息，来供后面 read write lseek 使用，目标是获取到：
+
+```c title="include/fs.h" linenums="21"
+struct fat32_dir {
+    uint32_t cluster;   // 文件的目录项所在的簇
+    uint32_t index;     // 文件的目录项是该簇中的第几个目录项
+};
+
+struct fat32_file {
+    uint32_t cluster;       // 文件开头所在的簇
+    struct fat32_dir dir;   // 文件的目录项信息
+};
 ```
 
-我们使用最简单的判别文件系统的方式，文件前缀为 `/fat32/` 的即是本次 FAT32 文件系统中的文件，例如，在 `nish` 中我们尝试读取文件，使用的命令是 `cat /fat32/$FILENAME`. `file_open` 会根据前缀决定是否调用 `fat32_open_file` 函数。注意因为我们的文件一定在根目录下，也即 `/fat32/` 下，无需实现与目录遍历相关的逻辑。此外需要注意的是，需要将文件名统一转换为大写或小写，因为我们的实现是不区分大小写的。
+你需要遍历数据区开头的根目录扇区，找到 name 和 `path` 末尾的 `filename` 相匹配的 `fat32_dir_entry` 目录项结构体，再从其中得到这些信息。
 
-```c
-// arch/riscv/syscall.c
+!!! tip "为什么我匹配不到要打开的文件"
+    如果是使用 `memcmp` 来逐一比较 FAT32 文件系统根目录下的各个文件名和想要打开的文件名，则需要 8 个字节完全匹配。但是需要注意的是，FAT32 文件系统根目录下的文件名并不是以 "\0" 结尾的字符串，你需要参考 spec 或者 `disk.img` 中的内容来了解 FAT32 文件名的存储方式。
 
-struct fat32_file fat32_open_file(const char *path) {
-    struct fat32_file file;
-    /* todo: open the file according to path */
-    return file;
-}
-```
+#### 读取与写入文件
 
-!!! tip "为什么我总是打不开文件？"
-    一般我们用 `memcmp` 逐一比较 FAT32 文件系统根目录下的各个文件名以及欲打开的文件名。但是需要注意的是，FAT32 文件系统根目录下的文件名格式可不是 `\0` 结尾的。8 byte 中超出长度的部分是什么呢？留给你们自己探索。
+对于 FAT32 文件系统的文件读取，会调用到 `fat32_read` 函数，你需要根据 `file->fat32_file` 中的信息（即 open 的时候获取的信息）找到文件内容所在的簇，然后读取出文件内容到 `buf` 中。
 
-在打开文件后自然是进行文件的读取操作，需要先实现 `lseek` syscall. 注意实现之后需要在打开文件时将对应的 `fat32_lseek` 赋值到打开的 FAT32 文件系统中的文件的 `lseek` 函数指针上。
+!!! tip "Hint"
+    - 通过 `cluster_to_sector` 可以得到簇号对应的扇区号；
+    - 通过 `virtio_blk_read_sector` 对扇区进行读取；
+    - 你可能需要再通过读取目录项来获取文件长度；
+    - 读取是要从 `file->cfo` 开始的；
+    - 读取的长度可能会使得内容跨越了一个或几个扇区，你需要多次读取；
+    - 读取到了文件末尾就应该截止，并返回实际读取的长度；
+    - 如果 read 返回了 0，则说明已经读取到了文件末尾，这样用户态程序就知道文件已经完全读取结束了。
 
-```c
-// arch/riscv/kernel/syscall.c
+正确实现后，你应该可以看到 `cat /fat32/email` 的输出了：
 
-int64_t sys_lseek(int fd, int64_t offset, int whence) {
-    int64_t ret;
-    struct file* target_file = &(current->files[fd]);
-    if (target_file->opened) {
-        /* todo: indirect call */
-    } else {
-        printk("file not open\n");
-        ret = ERROR_FILE_NOT_OPEN;
-    }
-    return ret;
-}
+??? success "示例输出"
+    ```text
+    ...buddy_init done!
+    ...mm_init done!
+    ...proc_init done!
+    ...virtio_blk_init done!
+    ...fat32 partition #1 init done!
+    2024 ZJU Operating System
+    hello, stdout!
+    hello, stderr!
+    SHELL > cat /fat32/email
+    From: TORVALDS@klaava.Helsinki.FI (Linus Benedict Torvalds)
+    Newsgroups: comp.os.minix
+    Subject: What would you like to see most in minix?
+    Summary: small poll for my new operating system
+    Message-ID:
+    Date: 25 Aug 91 20:57:08 GMT
+    Organization: University of Helsinki
 
-// fs/fat32.c
+    Hello everybody out there using minix -
 
+    I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu) for 386(486) AT cones. This has been brewing since april, and is starting to get ready. I'd Tike any feedback on things people like/dislike in minix, as my 0S resembles it somewhat (same physical layout of the file-system (due to practical reasons) among other things) .
+
+    I've currently ported bash(1.08) and gcc(1.40), and things seem to work. This implies that I'll get something practical within a few months, andI'd like to know what features most people would want. Any suggestions are welcome, but I won't promise I'll implement them :-)
+
+                Linus (torvalds@kruuna.helsinki.fi)
+
+    PS. Yes . it's free of any minix code, and it has a multi-threaded fs. It is NOT protable (uses 386 task switching etc), and it probably never will support anything other than AT-hard disks, as that's all I have :-($
+    SHELL >
+    ```
+
+write 操作和 read 非常相似，只需要修改后再通过 `virtio_blk_write_sector` 写回扇区即可。
+
+!!! tip "本次实验不要求实现根据访问时间更新目录项信息"
+
+#### lseek 操作
+
+在 nish 处理 edit 的时候，会先进行 lseek 调整文件指针，然后再进行 write。而 lseek 在做的就是调整指针 `file->cfo` 的值，你需要实现：
+
+```c title="fs/fat32.c" linenums="67"
 int64_t fat32_lseek(struct file* file, int64_t offset, uint64_t whence) {
     if (whence == SEEK_SET) {
         file->cfo = /* to calculate */;
@@ -517,51 +484,46 @@ int64_t fat32_lseek(struct file* file, int64_t offset, uint64_t whence) {
 }
 ```
 
-然后需要完成 `fat32_read` 并将其赋值给打开的 FAT32 文件的 `read` 函数指针。
+具体 `whence` 的含义请自行搜索 spec。
 
-```c
-// fs/fat32.c
+#### 测试
 
-int64_t fat32_read(struct file* file, void* buf, uint64_t len) {
-    /* todo: read content to buf, and return read length */
-}
-```
+全部实现完成后，就可以实现文件的读写操作了：
 
-完成 FAT32 读的部分后，就已经可以在 `nish` 中使用 `cat /fat32/email` 来读取到在磁盘中预先存储的一个名为 email 的文件了。
+???+ success "示例输出"
+    ```text
+    ...buddy_init done!
+    ...mm_init done!
+    ...proc_init done!
+    ...virtio_blk_init done!
+    ...fat32 partition #1 init done!
+    2024 ZJU Operating System
+    hello, stdout!
+    hello, stderr!
+    SHELL > echo "test"
+    test
+    SHELL > cat /fat32/email
+    From: torvalds@klaava.Helsinki.FI (Linus Benedict Torvalds)
+    ...
+    SHELL > edit /fat32/email 6 TORVALDS
+    SHELL > cat /fat32/email
+    From: TORVALDS@klaava.Helsinki.FI (Linus Benedict Torvalds)
+    ...
+    SHELL >
+    ```
 
-当然，最后还需要完成 `close` syscall 来将文件关闭。
+    这里通过 `edit /fat32/email 6 TORVALDS` 来将文件 "From" 后面的 torvalds 改成了大写。除此之外你也可以发现重新 `make run` 运行，并直接 `cat /fat32/email`，输出的也是修改后的大写 TORVALDS，因为这部分修改是持久保存在 disk.img 磁盘中的。
 
-#### 写入 FAT32 文件
+## 实验任务与要求
 
-在完成读取后，就可以仿照读取的函数完成对文件的修改。在测试时可以使用 `edit` 命令在 `nish` 中对文件做出修改。需要实现 `fat32_write`，可以参考前面的 `fat32_read` 来进行实现。
+!!! note "本次实验为 bonus，无思考题"
 
-```c
-// fs/fat32.c
+- 请各位同学独立完成作业，任何抄袭行为都将使本次作业判为 0 分。
+- 在学在浙大中提交：
+    - 整个工程代码的压缩包（提交之前请使用 `make clean` 清除所有构建产物）
+    - pdf 格式的实验报告：
+        - 记录实验过程并截图（4.1-4.3），并对每一步的命令以及结果进行必要的解释；
+        - 记录遇到的问题和心得体会。
 
-int64_t fat32_write(struct file* file, const void* buf, uint64_t len) {
-    /* todo: fat32_write */
-}
-```
+!!! tip "关于实验报告内容要求，可见：[常见问题及解答 - 实验提交要求](faq.md#_2)"
 
-## 测试
-
-```
-[S] buddy_init done!
-[S] proc_init done!
-[S] virtio_blk_init done!
-[S] fat32 partition init done!
-2024 Hello RISC-V
-...
-...
-hello, stdout!
-hello, stderr!
-SHELL > echo "this is echo"
-this is echo
-SHELL > cat /fat32/email
-From: torvalds@klaava.Helsinki.FI (Linus Benedict Torvalds)
-...
-SHELL > edit /fat32/email 6 TORVALDS
-SHELL > cat /fat32/email
-From: TORVALDS@klaava.Helsinki.FI (Linus Benedict Torvalds)
-...
-```

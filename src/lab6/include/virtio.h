@@ -1,9 +1,8 @@
-#ifndef _VIRTIO_H
-#define _VIRTIO_H
+#ifndef __VIRTIO_H__
+#define __VIRTIO_H__
 
-#include <defs.h>
-#include <vm.h>
-#include <printk.h>
+#include "defs.h"
+#include "printk.h"
 
 #define DEVICE_ACKNOWLEDGE 1
 #define DEVICE_DRIVER 2
@@ -50,110 +49,110 @@
 #define IOMAP_OFFSET (0xffffffc800000000)
 
 struct virtio_regs {
-	uint32_t MagicValue;
-	uint32_t Version;
-	uint32_t DeviceID;
-	uint32_t VendorID;
-	uint32_t DeviceFeatures;
-	uint32_t DeviceFeaturesSel;
-	uint32_t _reserved0[2];
-	uint32_t DriverFeatures;
-	uint32_t DriverFeaturesSel;
-	uint32_t _reserved1[2];
-	uint32_t QueueSel;
-	uint32_t QueueNumMax;
-	uint32_t QueueNum;
-	uint32_t _reserved2[2];
-	uint32_t QueueReady;
-	uint32_t _reserved3[2];
-	uint32_t QueueNotify;
-	uint32_t _reserved4[3];
-	uint32_t InterruptStatus;
-	uint32_t InterruptACK;
-	uint32_t _reserved5[2];
-	uint32_t Status;
-	uint32_t _reserved6[3];
-	uint32_t QueueDescLow;
-	uint32_t QueueDescHigh;
-	uint32_t _reserved7[2];
-	uint32_t QueueAvailLow;
-	uint32_t QueueAvailHigh;
-	uint32_t _reserved8[2];
-	uint32_t QueueUsedLow;
-	uint32_t QueueUsedHigh;
-	uint32_t _reserved9[21];
-	uint32_t ConfigGeneration;
-	uint32_t Config[0];
+    uint32_t MagicValue;
+    uint32_t Version;
+    uint32_t DeviceID;
+    uint32_t VendorID;
+    uint32_t DeviceFeatures;
+    uint32_t DeviceFeaturesSel;
+    uint32_t _reserved0[2];
+    uint32_t DriverFeatures;
+    uint32_t DriverFeaturesSel;
+    uint32_t _reserved1[2];
+    uint32_t QueueSel;
+    uint32_t QueueNumMax;
+    uint32_t QueueNum;
+    uint32_t _reserved2[2];
+    uint32_t QueueReady;
+    uint32_t _reserved3[2];
+    uint32_t QueueNotify;
+    uint32_t _reserved4[3];
+    uint32_t InterruptStatus;
+    uint32_t InterruptACK;
+    uint32_t _reserved5[2];
+    uint32_t Status;
+    uint32_t _reserved6[3];
+    uint32_t QueueDescLow;
+    uint32_t QueueDescHigh;
+    uint32_t _reserved7[2];
+    uint32_t QueueAvailLow;
+    uint32_t QueueAvailHigh;
+    uint32_t _reserved8[2];
+    uint32_t QueueUsedLow;
+    uint32_t QueueUsedHigh;
+    uint32_t _reserved9[21];
+    uint32_t ConfigGeneration;
+    uint32_t Config[0];
 };
 
 struct virtio_desc {
-	uint64_t addr;
-	uint32_t len;
-	uint16_t flags;
-	uint16_t next;
+    uint64_t addr;
+    uint32_t len;
+    uint16_t flags;
+    uint16_t next;
 };
 
 struct virtio_avail {
-	uint16_t flags;
-	uint16_t idx;
-	uint16_t ring[VIRTIO_QUEUE_SIZE];
-	uint16_t used_event;
+    uint16_t flags;
+    uint16_t idx;
+    uint16_t ring[VIRTIO_QUEUE_SIZE];
+    uint16_t used_event;
 };
 
 struct virtio_used_elem {
-	uint32_t id;
-	uint32_t len;
+    uint32_t id;
+    uint32_t len;
 };
 
 struct virtio_used {
-	uint16_t flags;
-	uint16_t idx;
-	struct virtio_used_elem ring[VIRTIO_QUEUE_SIZE];
-	uint16_t avail_event;
+    uint16_t flags;
+    uint16_t idx;
+    struct virtio_used_elem ring[VIRTIO_QUEUE_SIZE];
+    uint16_t avail_event;
 };
 
 struct vring {
-	uint16_t num;
-	struct virtio_desc *desc;
-	struct virtio_avail *avail;
-	struct virtio_used *used;
+    uint16_t num;
+    struct virtio_desc *desc;
+    struct virtio_avail *avail;
+    struct virtio_used *used;
 };
 
 struct virtio_blk_req {
-        uint32_t type;
-        uint32_t reserved;
-        uint64_t sector;
-        // uint8_t  status;
+    uint32_t type;
+    uint32_t reserved;
+    uint64_t sector;
+    // uint8_t  status;
 };
 
 struct virtio_blk_config {
-	uint32_t capacity_lo;
-	uint32_t capacity_hi;
-	uint32_t size_max;
-	uint32_t seg_max;
-	uint16_t geometry[4];
-	uint32_t blk_size;
-	uint8_t  physical_block_exp;
-	uint8_t  alignment_offset;
-	uint16_t min_io_size;
-	uint32_t opt_io_size;
-	uint8_t  wce;
-	uint8_t  unused;
-	uint16_t num_queues;
-	uint32_t reserved;
+    uint32_t capacity_lo;
+    uint32_t capacity_hi;
+    uint32_t size_max;
+    uint32_t seg_max;
+    uint16_t geometry[4];
+    uint32_t blk_size;
+    uint8_t  physical_block_exp;
+    uint8_t  alignment_offset;
+    uint16_t min_io_size;
+    uint32_t opt_io_size;
+    uint8_t  wce;
+    uint8_t  unused;
+    uint16_t num_queues;
+    uint32_t reserved;
 };
 
 enum blk_request_type {
-	VIRTIO_BLK_T_IN = 0,
-	VIRTIO_BLK_T_OUT = 1,
-	/* This bit says it's a scsi command, not an actual read or write. */
-	VIRTIO_BLK_T_SCSI_CMD = 2,
-	/* Cache flush command */
-	VIRTIO_BLK_T_FLUSH = 4,
-	/* Get device ID command */
-	VIRTIO_BLK_T_GET_ID = 8,
-	/* Barrier before this op. */
-	VIRTIO_BLK_T_BARRIER = 0x80000000,
+    VIRTIO_BLK_T_IN = 0,
+    VIRTIO_BLK_T_OUT = 1,
+    /* This bit says it's a scsi command, not an actual read or write. */
+    VIRTIO_BLK_T_SCSI_CMD = 2,
+    /* Cache flush command */
+    VIRTIO_BLK_T_FLUSH = 4,
+    /* Get device ID command */
+    VIRTIO_BLK_T_GET_ID = 8,
+    /* Barrier before this op. */
+    VIRTIO_BLK_T_BARRIER = 0x80000000,
 };
  
 
@@ -177,16 +176,12 @@ static inline void out32(uint32_t *memory_address, uint32_t data) {
 
 int virtio_dev_test(uint64_t virtio_addr);
 void virtio_dev_init();
-
-
 void vring_init(struct vring *vr, uint32_t num, void *p, uint64_t align);
-
-void virtio_blk_read_sector(uint64_t sector, void* buf);
-
+void virtio_blk_read_sector(uint64_t sector, void *buf);
 void virtio_blk_write_sector(uint64_t sector, const void *buf);
 
 static inline void memory_barrier() {
-  asm volatile ("fence rw, rw"); // Full memory fence for both read and write
+    asm volatile ("fence rw, rw"); // Full memory fence for both read and write
 }
 
 static inline uint64_t io_to_virt(uint64_t pa) {

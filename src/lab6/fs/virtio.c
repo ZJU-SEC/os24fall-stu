@@ -1,7 +1,8 @@
-#include <virtio.h>
-#include <mm.h>
-#include <debug.h>
-#include <clock.h>
+#include "virtio.h"
+#include "mm.h"
+#include "clock.h"
+
+#define virt_to_phys(va) ((uint64_t)(va) - PA2VA_OFFSET)
 
 volatile struct virtio_regs * virtio_blk_regs = NULL;
 struct vring virtio_blk_ring;
@@ -12,15 +13,6 @@ void virtio_blk_driver_init() {
     virtio_blk_regs->Status |= DEVICE_ACKNOWLEDGE;
     virtio_blk_regs->Status |= DEVICE_DRIVER;
     memory_barrier();
-
-    // printk("[S] virtio_blk_regs->Status: %08x\n", virtio_blk_regs->Status);
-
-    memory_barrier();
-
-    // printk("[S] virtio_blk_regs->Status: %08x\n", virtio_blk_regs->Status);
-
-    // printk("[S] virtio_blk_regs->QueueNumMax: %08x\n", virtio_blk_regs->QueueNumMax);
-    memory_barrier();
 }
 
 void virtio_blk_feature_init() {
@@ -30,13 +22,8 @@ void virtio_blk_feature_init() {
     virtio_blk_regs->DriverFeatures = 0x30000200;
     virtio_blk_regs->DriverFeaturesSel = 1;
     virtio_blk_regs->DriverFeatures = 0x0;
-
-
     virtio_blk_regs->Status |= DEVICE_FEATURES_OK;
     memory_barrier();
-    // printk("[S] virtio_blk_regs->DeviceFeatures: %08x\n", virtio_blk_regs->DeviceFeatures);
-
-    // printk("[S] virtio_blk_regs->DriverFeatures: %08x\n", virtio_blk_regs->DriverFeatures);
 }
 
 void virtio_blk_queue_init() {
@@ -50,7 +37,6 @@ void virtio_blk_queue_init() {
     virtio_blk_ring.desc = (struct virtio_desc*)(pages);
     virtio_blk_ring.avail = (struct virtio_avail*)(pages + PGSIZE);
     virtio_blk_ring.used = (struct virtio_used*)(pages + 2*PGSIZE);
-
     virtio_blk_ring.avail->flags = VIRTQ_AVAIL_F_NO_INTERRUPT;
 
     for (int i = 1; i < VIRTIO_QUEUE_SIZE; i++) {
@@ -67,8 +53,6 @@ void virtio_blk_queue_init() {
     virtio_blk_regs->QueueUsedHigh = virt_to_phys((uint64_t)virtio_blk_ring.used) >> 32;
     memory_barrier();
 
-    // virtio_blk_regs->Queue
-
     virtio_blk_regs->QueueReady = 1;
     memory_barrier();
 }
@@ -76,21 +60,12 @@ void virtio_blk_queue_init() {
 void virtio_blk_config_init() {
     volatile struct virtio_blk_config *config = (struct virtio_blk_config*)(&virtio_blk_regs->Config);
     uint64_t capacity = ((uint64_t)config->capacity_hi << 32) | config->capacity_lo;
-    // printk("[S] virtio-blk Disk Capacity: %016llx\n", capacity);
 }
 
-// char virtio_blk_buf[VIRTIO_BLK_SECTOR_SIZE];
 char virtio_blk_status;
 struct virtio_blk_req virtio_blk_req;
 
 void virtio_blk_cmd(uint32_t type, uint32_t sector, void* buf) {
-
-    // printk("avail->idx: %d, used->idx: %d\n", virtio_blk_ring.avail->idx, virtio_blk_ring.used->idx);
-
-    // for (int i = 1; i < VIRTIO_QUEUE_SIZE; i++) {
-    //     virtio_blk_ring.desc[i - 1].next = i;
-    // }
-
 	virtio_blk_req.type = type;
     virtio_blk_req.sector = sector;
 
@@ -127,38 +102,21 @@ void virtio_blk_read_sector(uint64_t sector, void *buf) {
     while (1) {
         if (virtio_blk_ring.used->idx != original_idx) {
             break;
-        } else {
-            // printk("[S] wait for disk read  to finish...\n");
         }
     }
-    // printk("[S] virtio_blk_ring.used len: %d\n", virtio_blk_ring.desc[virtio_blk_ring.used->ring[virtio_blk_ring.used->idx].id].len);
-    uint64_t used_index = (virtio_blk_ring.used->idx - 1) % VIRTIO_QUEUE_SIZE;
-    uint64_t used_len = virtio_blk_ring.used->ring[used_index].len;
-    // printk("[S] used_len: %d\n", used_len);
-    uint64_t descriptor_id = virtio_blk_ring.used->ring[used_index].id;
-    uint64_t descriptor_len = virtio_blk_ring.desc[descriptor_id].len;
 }
 
 void virtio_blk_write_sector(uint64_t sector, const void *buf) {
     uint64_t original_idx = virtio_blk_ring.used->idx;
-    // virtio_blk_cmd(VIRTIO_BLK_T_IN | VIRTIO_BLK_T_OUT, sector, (void*)buf);
     virtio_blk_cmd(VIRTIO_BLK_T_OUT, sector, (void*)buf);
     while (1) {
         if (virtio_blk_ring.used->idx != original_idx) {
             break;
-        } else {
-            // printk("[S] wait for disk write to finish...\n");
         }
     }
-    uint64_t used_index = (virtio_blk_ring.used->idx - 1) % VIRTIO_QUEUE_SIZE;
-    uint64_t used_len = virtio_blk_ring.used->ring[used_index].len;
-    // printk("[S] used_len: %d\n", used_len);
-    uint64_t descriptor_id = virtio_blk_ring.used->ring[used_index].id;
-    uint64_t descriptor_len = virtio_blk_ring.desc[descriptor_id].len;
 }
 
 void virtio_blk_init() {
-
     // First, tell the device that the driver is ok
     virtio_blk_driver_init();
     // Second, initialize the features
@@ -168,11 +126,9 @@ void virtio_blk_init() {
     // Now, start initialize the vring
     virtio_blk_queue_init();
 
-    // virtio_blk_cmd(VIRTIO_BLK_T_IN, 1);
     char buf[VIRTIO_BLK_SECTOR_SIZE];
 
     virtio_blk_read_sector(0, buf);
-    // dump_memory((uint64_t)buf, 512);
 
     // test if the disk is added properly
     char boot_signature[2];
@@ -180,13 +136,10 @@ void virtio_blk_init() {
     boot_signature[1] = buf[511];
 
     if (boot_signature[0] != 0x55 || boot_signature[1] != 0xaa) {
-        printk("[S] mbr boot signature not found!\n");
-        while (1);
-    } else {
-        // printk("[S] mbr boot signature found!\n");
+        Err("[S] mbr boot signature not found!");
     }
 
-    printk("[S] virtio_blk_init done!\n");
+    printk("...virtio_blk_init done!\n");
 }
 
 int virtio_dev_test(uint64_t virtio_addr) {
@@ -194,7 +147,6 @@ int virtio_dev_test(uint64_t virtio_addr) {
 
     struct virtio_regs *virtio_header = virtio_space;
     if (in32(&virtio_header->DeviceID) == ID_VIRTIO_BLK) {
-        // printk("[S] virtio_blk found!\n");
         virtio_blk_regs = virtio_space;
     }
 

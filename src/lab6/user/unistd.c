@@ -1,7 +1,7 @@
 #include "unistd.h"
 #include "syscall.h"
 
-int64_t write(int fd, const void *buf, uint64_t count) {
+int write(int fd, const void *buf, uint64_t count) {
     char temp_buf[count + 1];
     for (int i = 0; i < count; i++) {
         temp_buf[i] = ((char*)buf)[i];
@@ -16,11 +16,11 @@ int64_t write(int fd, const void *buf, uint64_t count) {
                   "ecall\n"
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
-                  : "i" (SYS_WRITE), "r" (fd), "r" (&temp_buf), "r" (count));
+                  : "i" (SYS_WRITE), "r" ((int64_t)fd), "r" (&temp_buf), "r" (count));
     return syscall_ret;
 }
 
-int64_t read(int fd, void *buf, uint64_t count) {
+int read(int fd, void *buf, uint64_t count) {
     long syscall_ret;
     asm volatile ("li a7, %1\n"
                   "mv a0, %2\n"
@@ -29,11 +29,11 @@ int64_t read(int fd, void *buf, uint64_t count) {
                   "ecall\n"
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
-                  : "i" (SYS_READ), "r" (fd), "r" (buf), "r" (count));
+                  : "i" (SYS_READ), "r" ((int64_t)fd), "r" (buf), "r" (count));
     return syscall_ret;   
 }
 
-int64_t sys_openat(int dfd, char *filename, int flags) {
+int sys_openat(int dfd, char *filename, int flags) {
     long syscall_ret;
     asm volatile ("li a7, %1\n"
                   "mv a0, %2\n"
@@ -42,11 +42,11 @@ int64_t sys_openat(int dfd, char *filename, int flags) {
                   "ecall\n"
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
-                  : "i" (SYS_OPENAT), "r" (dfd), "r" (filename), "r" (flags));
+                  : "i" (SYS_OPENAT), "r" ((int64_t)dfd), "r" (filename), "r" ((int64_t)flags));
     return syscall_ret;   
 }
 
-int64_t open(char *filename, int flags) {
+int open(char *filename, int flags) {
     return sys_openat(AT_FDCWD, filename, flags);
 }
 
@@ -57,11 +57,11 @@ int close(int fd) {
                   "ecall\n"
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
-                  : "i" (SYS_CLOSE), "r" (fd));
+                  : "i" (SYS_CLOSE), "r" ((int64_t)fd));
     return syscall_ret;
 }
 
-int64_t lseek(int fd, int64_t offset, int whence) {
+int lseek(int fd, int offset, int whence) {
     long syscall_ret;
     asm volatile ("li a7, %1\n"
                   "mv a0, %2\n"
@@ -70,6 +70,6 @@ int64_t lseek(int fd, int64_t offset, int whence) {
                   "ecall\n"
                   "mv %0, a0\n"
                   : "+r" (syscall_ret)
-                  : "i" (SYS_LSEEK), "r" (fd), "r" (offset), "r" (whence));
+                  : "i" (SYS_LSEEK), "r" ((int64_t)fd), "r" ((int64_t)offset), "r" ((int64_t)whence));
     return syscall_ret;
 }

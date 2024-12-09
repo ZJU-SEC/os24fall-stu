@@ -1,7 +1,7 @@
-#ifndef _MBR_H
-#define _MBR_H
+#ifndef __MBR_H__
+#define __MBR_H__
 
-#include <defs.h>
+#include "defs.h"
 
 #define FAT_ENTRY_SIZE 32
 #define FAT_PARTITION_NUMBER 1
@@ -75,10 +75,10 @@ struct __attribute__((packed)) ext2_super_block {
 };
 
 struct partition_info {
-	uint32_t lba;
-	uint32_t size;
-	uint8_t status;
-	uint8_t type;
+    uint32_t lba;
+    uint32_t size;
+    uint8_t status;
+    uint8_t type;
 };
 
 #define MBR_MAX_PARTITIONS 4
@@ -86,7 +86,5 @@ struct partition_info {
 void mbr_init();
 
 void partition_init(int partion_number, uint64_t start_lba, uint64_t sector_count);
-
-// void bpb_print(struct bpb_layout *bpb);
 
 #endif

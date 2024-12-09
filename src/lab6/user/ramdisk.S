@@ -1,4 +1,0 @@
-.section .ramdisk
-
-.incbin "uapp"
-

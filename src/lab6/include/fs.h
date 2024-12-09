@@ -1,11 +1,10 @@
-#ifndef _FS_H
-#define _FS_H
+#ifndef __FS_H__
+#define __FS_H__
 
-#include <defs.h>
-// #include <fat32.h>
+#include "defs.h"
 
 #define MAX_PATH_LENGTH 80
-#define MAX_FILE_NUMBER (PGSIZE / sizeof(file_open))
+#define MAX_FILE_NUMBER 16
 
 #define SEEK_SET 0
 #define SEEK_CUR 1
@@ -20,9 +19,8 @@
 #define FS_TYPE_EXT2  0x2
 
 struct fat32_dir {
-	uint32_t cluster;
-    // entry index in the cluster
-    uint32_t index;
+    uint32_t cluster;
+    uint32_t index;     // entry index in the cluster
 };
 
 struct fat32_file {
@@ -30,8 +28,7 @@ struct fat32_file {
     struct fat32_dir dir;
 };
 
-// Opened file in a thread.
-struct file {
+struct file {   // Opened file in a thread.
     uint32_t opened;
     uint32_t perms;
     int64_t cfo;
@@ -41,18 +38,19 @@ struct file {
         struct fat32_file fat32_file;
     };
 
-    int64_t (*lseek) (struct file* file, int64_t offset, uint64_t whence);
-    int64_t (*write) (struct file* file, const void* buf, uint64_t len);
-    int64_t (*read)  (struct file* file, void* buf, uint64_t len);
+    int64_t (*lseek) (struct file *file, int64_t offset, uint64_t whence);
+    int64_t (*write) (struct file *file, const void *buf, uint64_t len);
+    int64_t (*read)  (struct file *file, void *buf, uint64_t len);
 
     char path[MAX_PATH_LENGTH];
 };
 
-// Return a file array, that can contain MAX_FILE_NUMBER opened files.
-struct file* file_init();
+struct files_struct {
+    struct file fd_array[MAX_FILE_NUMBER];
+};
 
-void file_open(struct file* file, const char* path, int flags);
-
-struct volumn {};
+struct files_struct *file_init();
+int32_t file_open(struct file *file, const char *path, int flags);
+uint32_t get_fs_type(const char *filename);
 
 #endif

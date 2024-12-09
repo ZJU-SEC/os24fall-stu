@@ -1,10 +1,8 @@
-#ifndef _FAT32_H
-#define _FAT32_H
+#ifndef __FAT32_H__
+#define __FAT32_H__
 
-#include <defs.h>
-// #include <fs.h>
-#include <fs.h>
-
+#include "defs.h"
+#include "fs.h"
 
 struct __attribute__((packed)) fat32_bpb {
     uint8_t jmp_boot[3];
@@ -62,13 +60,8 @@ struct fat32_dir_entry {
 };
 
 void dump_fat32_bpb(struct fat32_bpb *bpb);
-
 void fat32_init(uint64_t lba, uint64_t size);
-
 int is_fat32(uint64_t lba);
-
-// void fat32_open_dir(struct fat32_dir* dir, const char* path);
-
 struct fat32_file fat32_open_file(const char *path);
 
 int64_t fat32_lseek(struct file* file, int64_t offset, uint64_t whence);
