@@ -1,6 +1,5 @@
 #include "virtio.h"
 #include "mm.h"
-#include "clock.h"
 
 #define virt_to_phys(va) ((uint64_t)(va) - PA2VA_OFFSET)
 
