@@ -6,7 +6,7 @@
           "type": "cppdbg",
           "request": "launch",
           "miDebuggerServerAddress": "localhost:1234",
-          "program": "/home/gsy/os24fall-stu/src/lab3/vmlinux",
+          "program": "/home/gsy/os24fall-stu/src/lab4/vmlinux",
           "args": [],
           "stopAtEntry": true,
           "externalConsole": false,
